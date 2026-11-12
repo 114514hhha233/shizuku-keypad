@@ -206,7 +206,9 @@
     <string name="dialog_key_label_section">按键上显示的文字</string>
     <string name="dialog_key_label_hint">例如 W、跳、攻击</string>
     <string name="dialog_key_size_section">按键大小（dp，40 ~ 120）</string>
-    <string name="dialog_key_size_hint">62</string>
+    <string name="dialog_key_size_hint">60</string>
+    <string name="dialog_key_size_preset">常用尺寸</string>
+    <string name="dialog_key_size_pick_title">选择按键大小（dp）</string>
     <string name="dialog_key_shape_section">按键形状</string>
     <string name="cb_one_key">一键开关（工具栏总开关关闭时，此按键整体隐藏）</string>
     <string name="cb_latch">锁定键（点一下保持按住，再点一下松开；仅普通键值键）</string>

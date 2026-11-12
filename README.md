@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ 下载 APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.5/shizuku-keypad-1.5.apk)** ·
+**[⬇ 下载 APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6/shizuku-keypad-1.6.apk)** ·
 [源码](https://github.com/114514hhha233/shizuku-keypad) ·
 [问题反馈](https://github.com/114514hhha233/shizuku-keypad/issues)
 
@@ -22,7 +22,7 @@
 在 Android 上给游戏加一套可自由摆放的虚拟键鼠：每个按键都是独立悬浮窗，通过 **Shizuku** 把按键事件注入到系统输入层，因此云游戏、串流、模拟器、原生手游都能用；不需要 root，也不需要改游戏。
 
 - 包名：`com.example.shizukukeypad`
-- 版本：1.5（versionCode 6）
+- 版本：1.6（versionCode 8）
 - 最低系统：Android 8.0（API 26），目标 API 34
 - 依赖：Shizuku 13.x（`dev.rikka.shizuku:api/aidl/provider:13.1.5`）
 - 语言：跟随系统，内置简体中文与英文
@@ -34,7 +34,7 @@
 ## 功能
 
 ### 按键
-- 每个按键一个独立 `TYPE_APPLICATION_OVERLAY` 窗口，位置互不干扰，可自由拖动、改大小（40–120dp）、圆形/圆角方形。
+- 每个按键一个独立 `TYPE_APPLICATION_OVERLAY` 窗口，位置互不干扰，可自由拖动、改大小（40–120dp，支持「常用尺寸」一键选择 40/50/60/70/80/90/100/120）、圆形/圆角方形。
 - 两种注入方式：
   - **键盘键**：通过 Shizuku 注入 `KeyEvent`（keyDown / keyUp），云游戏、串流、远程桌面可用。
   - **触摸键**：窗口本身设为 `FLAG_NOT_TOUCHABLE`，手指直接穿透到游戏，由系统提供**原生多点触控**，零注入延迟；同时按多个触摸键就是真正的多指。
@@ -126,7 +126,7 @@ IInputManager.injectInputEvent(event, MODE_WAIT_FOR_FINISH)
 
 ## 安装与使用
 
-1. 从 [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) 下载 `shizuku-keypad-1.5.apk` 并安装。
+1. 从 [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) 下载 `shizuku-keypad-1.6.apk` 并安装。
 2. 安装 [Shizuku](https://shizuku.rikka.app/)，并按官方说明通过 `adb shell` 或 root 启动服务。
 3. 打开应用，授予「悬浮窗」和「通知」权限。
 4. 在应用内点「授权 Shizuku」，允许后状态变为已连接。

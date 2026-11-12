@@ -43,7 +43,7 @@ data class KeyItem(
     /** 0 = 圆角方形，1 = 圆形 */
     var shape: Int = 0,
     /** 按键直径（dp），40..120 */
-    var sizeDp: Int = 62,
+    var sizeDp: Int = 60,
     /** 一键开关：勾选后，工具栏总开关关闭时这个按键会整体隐藏 */
     var switchable: Boolean = false,
     /** 锁定：点一下保持按住，再点一下松开（仅键值/鼠标键生效） */
@@ -348,7 +348,7 @@ object KeyStore {
                         keyCode = o.optInt("keyCode", KeyEvent.KEYCODE_ENTER),
                         type = type,
                         shape = o.optInt("shape", 0),
-                        sizeDp = o.optInt("sizeDp", 62).coerceIn(40, 120),
+                        sizeDp = o.optInt("sizeDp", 60).coerceIn(40, 120),
                         switchable = o.optBoolean("switchable", false),
                         latch = o.optBoolean("latch", false),
                         macro = o.optString("macro", ""),

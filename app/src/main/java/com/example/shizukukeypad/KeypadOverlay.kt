@@ -460,7 +460,7 @@ class KeypadOverlay(private val context: Context) {
     }
 
     private fun seedDefaults() {
-        val s = dp(62).toFloat()
+        val s = dp(60).toFloat()
         val gap = dp(10).toFloat()
         val marginX = dp(16).toFloat()
         val marginY = dp(24).toFloat()
@@ -1969,7 +1969,24 @@ class KeypadOverlay(private val context: Context) {
             listOf(getString(R.string.shape_rounded), getString(R.string.shape_circle))
         )
         spinnerShape.setSelection((existing?.shape ?: 0).coerceIn(0, 1))
-        etSize.setText((existing?.sizeDp ?: 62).toString())
+        etSize.setText((existing?.sizeDp ?: 60).toString())
+
+        // 常用尺寸：不想敲数字时直接点；当前值不在档位里也会显示并选中
+        val sizePresets = listOf(40, 50, 60, 70, 80, 90, 100, 120)
+        view.findViewById<Button>(R.id.btnSizePreset).setOnClickListener {
+            val cur = etSize.text.toString().trim().toIntOrNull()?.coerceIn(40, 120) ?: 60
+            val items = if (cur in sizePresets) sizePresets else (sizePresets + cur).sorted()
+            val pick = AlertDialog.Builder(themeCtx)
+                .setTitle(R.string.dialog_key_size_pick_title)
+                .setSingleChoiceItems(items.map { "$it dp" }.toTypedArray(), items.indexOf(cur)) { d, which ->
+                    etSize.setText(items[which].toString())
+                    d.dismiss()
+                }
+                .create()
+            // 悬浮层里弹窗必须显式指定 overlay 类型，否则 BadTokenException
+            pick.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+            pick.show()
+        }
 
         spinner.adapter = ArrayAdapter(
             themeCtx,
@@ -2022,18 +2039,6 @@ class KeypadOverlay(private val context: Context) {
                     etLabel.setText(label)
                     autoLabel = label
                 }
-                // 摇杆默认给大一点，62dp 太小不好推
-                if (KeyCatalog.all[position].type == KeyType.JOYSTICK &&
-                    etSize.text.toString().trim() == "62"
-                ) {
-                    etSize.setText("100")
-                }
-                // 指托要给拇指留够面积
-                if (KeyCatalog.all[position].type == KeyType.ANCHOR &&
-                    etSize.text.toString().trim() == "62"
-                ) {
-                    etSize.setText("88")
-                }
                 syncTypeVisibility(position)
             }
 
@@ -2065,7 +2070,7 @@ class KeypadOverlay(private val context: Context) {
                     } else {
                         option.keyCode
                     }
-                    val size = etSize.text.toString().trim().toIntOrNull()?.coerceIn(40, 120) ?: 62
+                    val size = etSize.text.toString().trim().toIntOrNull()?.coerceIn(40, 120) ?: 60
                     val shape = spinnerShape.selectedItemPosition.coerceIn(0, 1)
                     val switchable = cbOneKey.isChecked
                     val latchFlag = cbLatch.isChecked

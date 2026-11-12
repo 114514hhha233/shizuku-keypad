@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.5/shizuku-keypad-1.5.apk)** ·
+**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6/shizuku-keypad-1.6.apk)** ·
 [Source](https://github.com/114514hhha233/shizuku-keypad) ·
 [Issues](https://github.com/114514hhha233/shizuku-keypad/issues)
 
@@ -22,7 +22,7 @@
 Add a freely placeable virtual keyboard and mouse to Android games: every key is its own floating window, and **Shizuku** injects key events into the system input layer, so cloud gaming, game streaming, emulators and native mobile games all work — no root and no game modification required.
 
 - Package: `com.example.shizukukeypad`
-- Version: 1.5 (versionCode 6)
+- Version: 1.6 (versionCode 8)
 - Min Android: 8.0 (API 26), target API 34
 - Dependency: Shizuku 13.x (`dev.rikka.shizuku:api/aidl/provider:13.1.5`)
 - Language: follows the system; Simplified Chinese and English included
@@ -34,7 +34,7 @@ Add a freely placeable virtual keyboard and mouse to Android games: every key is
 ## Features
 
 ### Keys
-- Each key is its own `TYPE_APPLICATION_OVERLAY` window, freely draggable, resizable (40–120dp), round or rounded-square.
+- Each key is its own `TYPE_APPLICATION_OVERLAY` window, freely draggable, resizable (40–120dp, with one-tap presets 40/50/60/70/80/90/100/120), round or rounded-square.
 - Two injection modes:
   - **Keyboard keys**: inject `KeyEvent` (keyDown / keyUp) via Shizuku — works with cloud gaming, streaming and remote desktop.
   - **Touch keys**: the window is set to `FLAG_NOT_TOUCHABLE`, so fingers pass straight through to the game and the system provides **native multi-touch** with zero injection latency; pressing several touch keys at once is true multi-finger input.
@@ -126,7 +126,7 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 
 ## Install & usage
 
-1. Download `shizuku-keypad-1.5.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
+1. Download `shizuku-keypad-1.6.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
 2. Install [Shizuku](https://shizuku.rikka.app/) and start its service via `adb shell` or root as described in its documentation.
 3. Open the app and grant "Display over other apps" and notification permissions.
 4. Tap "Authorize Shizuku" in the app; the status should become connected.

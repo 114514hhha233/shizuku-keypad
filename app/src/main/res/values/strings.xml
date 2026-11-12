@@ -206,7 +206,9 @@
     <string name="dialog_key_label_section">Text shown on the key</string>
     <string name="dialog_key_label_hint">e.g. W, Jump, Attack</string>
     <string name="dialog_key_size_section">Key size (dp, 40 ~ 120)</string>
-    <string name="dialog_key_size_hint">62</string>
+    <string name="dialog_key_size_hint">60</string>
+    <string name="dialog_key_size_preset">Sizes</string>
+    <string name="dialog_key_size_pick_title">Key size (dp)</string>
     <string name="dialog_key_shape_section">Key shape</string>
     <string name="cb_one_key">One-key switch (hidden when the toolbar master switch is off)</string>
     <string name="cb_latch">Latch key (tap to hold, tap again to release; normal keys only)</string>
