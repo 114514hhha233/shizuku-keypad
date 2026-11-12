@@ -4,6 +4,8 @@
 
 # 哈基米虚拟键盘
 
+**简体中文** · [English](README.en.md)
+
 **给 Android 手机加一套能拖能改的虚拟键盘、摇杆和鼠标——不用 root，不用改游戏。**
 
 [![Release](https://img.shields.io/github/v/release/114514hhha233/shizuku-keypad?label=release)](https://github.com/114514hhha233/shizuku-keypad/releases)
