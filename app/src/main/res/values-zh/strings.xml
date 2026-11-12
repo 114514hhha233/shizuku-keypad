@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用 / 服务 -->
+    <string name="app_name">哈基米虚拟键盘</string>
+    <string name="ime_service_name">按键空输入法</string>
+
+    <!-- 主界面 -->
+    <string name="main_subtitle">Shizuku 屏幕按键映射 · 云游戏 / 横竖屏通用</string>
+    <string name="shizuku_checking">Shizuku：检测中…</string>
+    <string name="detail_checking">正在检测运行状态</string>
+    <string name="btn_authorize_shizuku">授权 Shizuku</string>
+    <string name="btn_grant_overlay">授予悬浮窗权限</string>
+    <string name="section_floating_keys">悬浮按键</string>
+    <string name="keys_count_default">按键数量：默认布局</string>
+    <string name="btn_show_virtual_keys">显示虚拟按键</string>
+    <string name="btn_hide_virtual_keys">隐藏虚拟按键</string>
+    <string name="btn_reset_layout">恢复默认布局</string>
+    <string name="section_presets">配置预设</string>
+    <string name="presets_desc">预设保存在本机；导出的 JSON 可以通过剪贴板备份或分享</string>
+    <string name="btn_save_preset">保存预设</string>
+    <string name="btn_load_preset">加载预设</string>
+    <string name="btn_export_clipboard">导出到剪贴板</string>
+    <string name="btn_import_clipboard">从剪贴板导入</string>
+    <string name="section_appearance">外观</string>
+    <string name="alpha_label">按键不透明度：%1$d%%</string>
+    <string name="alpha_label_default">按键不透明度：100%</string>
+    <string name="mouse_gain_label">鼠标灵敏度：%1$d%%</string>
+    <string name="mouse_gain_label_default">鼠标灵敏度：150%</string>
+    <string name="full_screen_mouse">全屏拖动鼠标</string>
+    <string name="full_screen_mouse_desc">关：小触控板拖动，游戏触摸不受影响\n开：整块屏幕都能拖，但会接管全屏触摸\n全屏下同样支持：轻点左键、双指点按右键、双指上下滑动滚轮</string>
+    <string name="block_ime">拦截系统输入法</string>
+    <string name="block_ime_desc">开：显示虚拟按键期间用内置空输入法顶替，避免系统键盘弹出遮挡、字母被转成中文\n隐藏按键或退出应用时自动恢复原输入法\n需要 Shizuku 授权</string>
+    <string name="section_help">使用说明</string>
+    <string name="help_text">① 启动 Shizuku 并授权，授予悬浮窗权限\n② 点「显示虚拟按键」，切到游戏即可使用\n\n悬浮条：\n· ≡ 拖动整条工具条，长按隐藏控制菜单（重新打开应用恢复）\n· 编辑：按键可自由拖动，点按键可改键位/文字/注入方式或删除\n· ＋：添加按键，内置字母、数字、F1-F12、方向键、小键盘、鼠标键，也可填自定义键值\n· 宏：点一下再点一个自定义按键，输入序列，如 Ctrl+Shift+K 或 W,Space,A\n· 存 / 读：把当前布局存成命名预设，或加载/删除预设\n· 一键：总开关。勾选「一键开关」的按键，关闭总开关时整体隐藏，再打开恢复\n· 整块：5 行紧凑键盘。Caps 点亮后 Shift 持续按住，再点关闭；「符」切到符号/F1-F12 页；拖动顶部 ≡ 移动，双指捏合调宽度\n· 鼠标：开关虚拟鼠标；触控板单指拖动移光标、轻点左键、双指点按右键、双指上下滑滚轮、长按切换左键按住\n· 鼠标按键：随时可用，位置跟随虚拟鼠标\n\n注入方式：\n· 键盘事件：云游戏 / 支持键盘的应用，可按住不放\n· 触摸点击：原生手游，按住按键时该位置保持触摸\n· 鼠标按键：发送鼠标按键事件，位置跟随虚拟鼠标\n\n配置预设：首页可保存/加载多套按键，导出到剪贴板或从剪贴板导入</string>
+    <string name="help_note">按键固定为深色底 + 白色边框，按下不变色</string>
+    <string name="about_link">关于软件与作者  ›</string>
+    <string name="about_link_with_version">%1$s · 关于软件与作者  ›</string>
+
+    <!-- 状态 -->
+    <string name="shizuku_not_running">Shizuku：未运行</string>
+    <string name="shizuku_running_unauthorized">Shizuku：已运行 · 未授权</string>
+    <string name="shizuku_authorized_status">Shizuku：已授权</string>
+    <string name="status_detail">注入通道：%1$s　·　悬浮窗：%2$s\n悬浮按键：%3$s</string>
+    <string name="status_ready">就绪</string>
+    <string name="status_not_ready">未就绪</string>
+    <string name="status_overlay_granted">已授予</string>
+    <string name="status_overlay_not_granted">未授予</string>
+    <string name="status_keys_showing">显示中</string>
+    <string name="status_keys_not_showing">未显示</string>
+    <string name="keys_count_saved">按键数量：%1$d 个</string>
+
+    <!-- 主界面提示 / 对话框 -->
+    <string name="toast_shizuku_authorized">Shizuku 已授权</string>
+    <string name="toast_shizuku_denied">Shizuku 授权被拒绝</string>
+    <string name="toast_install_shizuku">请先安装并启动 Shizuku</string>
+    <string name="toast_shizuku_version_low">Shizuku 版本过低（需要 11+）</string>
+    <string name="toast_already_authorized">已授权</string>
+    <string name="toast_allow_in_shizuku">请到 Shizuku 应用里手动允许本应用</string>
+    <string name="toast_need_shizuku_auth">请先完成 Shizuku 授权</string>
+    <string name="toast_need_overlay">请先授予悬浮窗权限</string>
+    <string name="toast_keys_shown">虚拟按键已显示，切到游戏即可使用</string>
+    <string name="toast_layout_cleared">已清除自定义布局，下次显示时恢复默认</string>
+    <string name="toast_ime_disabled">已关闭输入法拦截，恢复系统输入法</string>
+    <string name="toast_ime_enabled">已开启：虚拟按键显示期间拦截系统输入法</string>
+    <string name="toast_ime_enabled_later">已开启，显示虚拟按键后生效</string>
+    <string name="toast_no_keys">当前还没有自定义按键，先显示虚拟按键并添加几个</string>
+    <string name="preset_name_hint">预设名称，例如 云游戏</string>
+    <string name="preset_default_name">预设%1$d</string>
+    <string name="dialog_save_current_keys">保存当前按键</string>
+    <string name="action_save">保存</string>
+    <string name="toast_name_empty">名称不能为空</string>
+    <string name="toast_preset_saved">已保存预设「%1$s」</string>
+    <string name="action_cancel">取消</string>
+    <string name="toast_no_presets">还没有保存过预设</string>
+    <string name="dialog_load_preset">加载预设</string>
+    <string name="dialog_delete_preset">删除预设</string>
+    <string name="action_delete">删除</string>
+    <string name="toast_preset_deleted">已删除「%1$s」</string>
+    <string name="toast_preset_empty">这个预设是空的</string>
+    <string name="toast_preset_loaded">已加载预设「%1$s」</string>
+    <string name="toast_nothing_to_export">当前没有可导出的按键</string>
+    <string name="clip_label_config">虚拟按键配置</string>
+    <string name="toast_config_copied">配置已复制到剪贴板</string>
+    <string name="toast_clipboard_empty">剪贴板是空的</string>
+    <string name="toast_invalid_config">剪贴板里不是有效的按键配置</string>
+    <string name="dialog_import_config">导入配置</string>
+    <string name="dialog_import_message">导入会覆盖当前按键布局，继续？</string>
+    <string name="action_import">导入</string>
+    <string name="toast_config_imported">配置已导入</string>
+
+    <!-- 悬浮工具条 -->
+    <string name="toast_default_restored">已恢复默认布局</string>
+    <string name="toolbar_edit">编辑</string>
+    <string name="toolbar_done">完成</string>
+    <string name="toolbar_add">＋</string>
+    <string name="toolbar_macro">宏</string>
+    <string name="toolbar_macro_active">宏…</string>
+    <string name="toolbar_close">×</string>
+    <string name="toolbar_save">存</string>
+    <string name="toolbar_load">读</string>
+    <string name="toolbar_full">整块</string>
+    <string name="toolbar_full_on">整块开</string>
+    <string name="toolbar_one_key_on">一键开</string>
+    <string name="toolbar_one_key_off">一键关</string>
+    <string name="toolbar_mouse">鼠标</string>
+    <string name="toolbar_mouse_on">鼠标开</string>
+    <string name="panel_handle">≡  整块键盘</string>
+    <string name="toast_bind_exited">已退出</string>
+    <string name="toast_bind_prompt">点一个自定义按键，为它设置宏</string>
+    <string name="macro_hint">例：Ctrl+Shift+K  或  W,Space,A</string>
+    <string name="dialog_macro_title">按键「%1$s」的宏</string>
+    <string name="dialog_macro_message">逗号或空格分步骤，步骤内 + 表示同时按；留空则关闭宏</string>
+    <string name="toast_macro_invalid">没看懂这个宏，检查键名后重试</string>
+    <string name="toast_macro_disabled">已关闭宏</string>
+    <string name="toast_macro_saved">宏已保存</string>
+    <string name="toast_toolbar_hidden">控制菜单已隐藏，重新打开应用即可恢复</string>
+    <string name="toast_anchor_warning">输出点压在悬浮按键上，触摸可能失效：请在编辑模式把十字准星拖到游戏摇杆位置</string>
+    <string name="toast_inject_failed">注入失败：%1$s</string>
+    <string name="unknown_reason">未知原因</string>
+    <string name="toast_mouse_inject_failed">鼠标事件注入失败：%1$s</string>
+    <string name="toast_layout_saved">布局已保存</string>
+    <string name="toast_edit_mode">编辑模式：拖动摆放，点按修改或删除</string>
+    <string name="key_menu_title">按键「%1$s」</string>
+    <string name="key_menu_edit">修改键位 / 文字 / 方式</string>
+    <string name="key_menu_delete">删除这个按键</string>
+    <string name="dialog_delete_key">删除按键</string>
+    <string name="dialog_delete_key_message">确定删除「%1$s」？</string>
+    <string name="action_delete_confirm">删除</string>
+    <string name="dialog_stick_mode_option_key">键值模式（输出 WASD，云游戏可用）</string>
+    <string name="dialog_stick_mode_option_touch">触摸模式（在输出点注入手指，原生手游）</string>
+    <string name="toast_anchor_reset">保存后输出点回到摇杆右侧，编辑模式下可再拖准星微调</string>
+    <string name="shape_rounded">圆角方形</string>
+    <string name="shape_circle">圆形</string>
+    <string name="dialog_add_key">添加虚拟按键</string>
+    <string name="dialog_edit_key">修改按键</string>
+    <string name="action_add">添加</string>
+    <string name="toast_invalid_keycode">键值无效，请输入 1~400 之间的数字</string>
+    <string name="toast_hidden_by_one_key">「%1$s」受一键开关控制，当前总开关关闭，已隐藏</string>
+    <string name="toast_one_key_on">一键开关已打开：勾选的按键已显示</string>
+    <string name="toast_one_key_off">一键开关已关闭：勾选的按键已隐藏</string>
+    <string name="toast_game_keyboard_on">整块键盘已打开，拖顶部三条杠可以移动</string>
+    <string name="toast_game_keyboard_off">整块键盘已关闭</string>
+    <string name="toast_mouse_off">虚拟鼠标已关闭</string>
+    <string name="toast_mouse_fullscreen_hint">全屏拖动移动鼠标，轻点一下即左键单击</string>
+    <string name="toast_mouse_pad_hint">按住触控板拖动移动鼠标，点一下触控板即点击</string>
+    <string name="toast_switched_fullscreen">已切换为全屏拖动</string>
+    <string name="toast_switched_touchpad">已切换为触控板</string>
+    <string name="touchpad_hint">单指拖动·轻点左键\n双指点按右键·双指滑动滚轮\n长按切换左键按住</string>
+    <string name="toast_left_held">左键已按住，轻点触控板松开</string>
+    <string name="toast_left_released">左键已松开</string>
+    <string name="panel_key_symbols">符</string>
+    <string name="panel_key_space">空格</string>
+
+    <!-- 键位目录 -->
+    <string name="key_anchor">指托</string>
+    <string name="key_space">空格</string>
+    <string name="key_enter">回车</string>
+    <string name="key_backspace">退格</string>
+    <string name="key_dpad_center">确定</string>
+    <string name="key_back">返回</string>
+    <string name="key_home">主页</string>
+    <string name="key_menu">菜单</string>
+    <string name="key_numpad_0">小键盘0</string>
+    <string name="key_numpad_1">小键盘1</string>
+    <string name="key_numpad_2">小键盘2</string>
+    <string name="key_numpad_3">小键盘3</string>
+    <string name="key_numpad_4">小键盘4</string>
+    <string name="key_numpad_5">小键盘5</string>
+    <string name="key_numpad_6">小键盘6</string>
+    <string name="key_numpad_7">小键盘7</string>
+    <string name="key_numpad_8">小键盘8</string>
+    <string name="key_numpad_9">小键盘9</string>
+    <string name="key_numpad_add">小键盘+</string>
+    <string name="key_numpad_subtract">小键盘-</string>
+    <string name="key_numpad_multiply">小键盘*</string>
+    <string name="key_numpad_divide">小键盘/</string>
+    <string name="key_numpad_dot">小键盘.</string>
+    <string name="key_numpad_enter">小键盘回车</string>
+    <string name="key_custom">自定义键值…</string>
+    <string name="key_mouse_left">鼠标左键</string>
+    <string name="key_mouse_right">鼠标右键</string>
+    <string name="key_mouse_middle">鼠标中键</string>
+    <string name="key_wheel_up">滚轮上</string>
+    <string name="key_wheel_down">滚轮下</string>
+    <string name="key_joystick">虚拟摇杆</string>
+    <string name="key_fallback">键%1$d</string>
+
+    <!-- 关于界面 -->
+    <string name="about_back">‹ 返回</string>
+    <string name="about_title">关于</string>
+    <string name="version_label">版本 %1$s</string>
+    <string name="version_label_default">版本</string>
+    <string name="about_desc">通过 Shizuku 以 shell 身份注入按键、触摸与鼠标事件，把手机变成云游戏 / 远程桌面的虚拟键鼠。</string>
+    <string name="author_label">作者</string>
+    <string name="author_name">不会取名的基米</string>
+    <string name="bili_uid">B站 UID 604149349</string>
+    <string name="btn_open_bilibili">打开 B 站主页</string>
+    <string name="btn_copy_uid">复制 UID</string>
+    <string name="about_footer">本应用不申请网络权限，所有配置仅保存在本机。</string>
+    <string name="toast_no_browser">没有可用的浏览器</string>
+    <string name="toast_uid_copied">UID 已复制</string>
+    <string name="clip_label_bili_uid">B站UID</string>
+
+    <!-- 按键对话框 -->
+    <string name="dialog_key_section_key">键位</string>
+    <string name="dialog_key_label_section">按键上显示的文字</string>
+    <string name="dialog_key_label_hint">例如 W、跳、攻击</string>
+    <string name="dialog_key_size_section">按键大小（dp，40 ~ 120）</string>
+    <string name="dialog_key_size_hint">62</string>
+    <string name="dialog_key_shape_section">按键形状</string>
+    <string name="cb_one_key">一键开关（工具栏总开关关闭时，此按键整体隐藏）</string>
+    <string name="cb_latch">锁定键（点一下保持按住，再点一下松开；仅普通键值键）</string>
+    <string name="dialog_key_custom_code_section">自定义键值（Android KeyEvent keyCode）</string>
+    <string name="dialog_key_custom_code_hint">例如 66（回车）、29（A）、4（返回）</string>
+    <string name="dialog_key_stick_mode_section">摇杆模式</string>
+    <string name="dialog_key_stick_dirs_section">方向键值（上 W=51 / 下 S=47 / 左 A=29 / 右 D=32）</string>
+    <string name="hint_up">上</string>
+    <string name="hint_down">下</string>
+    <string name="hint_left">左</string>
+    <string name="hint_right">右</string>
+    <string name="btn_anchor_center">触摸输出点：恢复默认位置（摇杆右侧）</string>
+    <string name="stick_touch_desc">触摸模式会在输出点注入一根手指，用来推游戏自己的摇杆。编辑模式下屏幕上会出现黄色十字准星，把它拖到游戏摇杆中心即可；默认在摇杆右侧，避免被摇杆窗口挡住。</string>
+    <string name="inject_title">注入方式</string>
+    <string name="rb_key">键盘事件（云游戏 / 支持键盘的应用，可按住不放）</string>
+    <string name="rb_touch">触摸点击（原生手游，点击按键所在的屏幕位置）</string>
+    <string name="inject_hint">游戏里按键没反应，就把这个按键改成「触摸点击」。</string>
+
+    <!-- 通知 -->
+    <string name="notification_channel_name">虚拟按键</string>
+    <string name="notification_running_title">哈基米虚拟键盘运行中</string>
+    <string name="notification_running_text">悬浮按键已显示，点击回到应用</string>
+
+    <!-- 注入错误 -->
+    <string name="injector_shizuku_not_connected">Shizuku 服务未连接</string>
+    <string name="injector_no_input_service">拿不到 input 系统服务</string>
+    <string name="injector_as_interface_null">IInputManager.asInterface 返回空</string>
+    <string name="injector_init_failed">初始化失败：%1$s: %2$s</string>
+    <string name="injector_rejected">系统拒绝注入（injectInputEvent 返回 false）</string>
+    <string name="injector_exception">注入异常：%1$s: %2$s</string>
+</resources>

@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App / services -->
+    <string name="app_name">Hajimi Virtual Keypad</string>
+    <string name="ime_service_name">Blank Keypad IME</string>
+
+    <!-- Main screen -->
+    <string name="main_subtitle">Shizuku screen key mapping · Works with cloud gaming / portrait &amp; landscape</string>
+    <string name="shizuku_checking">Shizuku: checking…</string>
+    <string name="detail_checking">Checking runtime status</string>
+    <string name="btn_authorize_shizuku">Authorize Shizuku</string>
+    <string name="btn_grant_overlay">Grant overlay permission</string>
+    <string name="section_floating_keys">Floating keys</string>
+    <string name="keys_count_default">Keys: default layout</string>
+    <string name="btn_show_virtual_keys">Show virtual keys</string>
+    <string name="btn_hide_virtual_keys">Hide virtual keys</string>
+    <string name="btn_reset_layout">Reset layout</string>
+    <string name="section_presets">Presets</string>
+    <string name="presets_desc">Presets are stored on this device; exported JSON can be backed up or shared via the clipboard</string>
+    <string name="btn_save_preset">Save preset</string>
+    <string name="btn_load_preset">Load preset</string>
+    <string name="btn_export_clipboard">Export to clipboard</string>
+    <string name="btn_import_clipboard">Import from clipboard</string>
+    <string name="section_appearance">Appearance</string>
+    <string name="alpha_label">Key opacity: %1$d%%</string>
+    <string name="alpha_label_default">Key opacity: 100%</string>
+    <string name="mouse_gain_label">Mouse sensitivity: %1$d%%</string>
+    <string name="mouse_gain_label_default">Mouse sensitivity: 150%</string>
+    <string name="full_screen_mouse">Full-screen mouse drag</string>
+    <string name="full_screen_mouse_desc">Off: drag on a small touchpad, game touches are unaffected\nOn: drag anywhere on the screen, but takes over full-screen touch\nAlso works full-screen: tap for left click, two-finger tap for right click, two-finger swipe to scroll</string>
+    <string name="block_ime">Block system IME</string>
+    <string name="block_ime_desc">On: while virtual keys are shown, a built-in blank IME takes over so the system keyboard cannot cover the screen or turn letters into Chinese\nRestores the previous IME when keys are hidden or the app exits\nRequires Shizuku authorization</string>
+    <string name="section_help">Instructions</string>
+    <string name="help_text">① Start Shizuku and authorize it, then grant overlay permission\n② Tap “Show virtual keys” and switch to the game\n\nToolbar:\n· ≡ Drag the whole toolbar; long-press to hide the control menu (reopen the app to restore)\n· Edit: keys can be dragged freely; tap a key to change its key/label/injection method or delete it\n· ＋: Add a key; letters, digits, F1-F12, arrow keys, numpad and mouse keys are built in, and a custom key code can be entered\n· Macro: tap once and then tap a custom key, enter a sequence such as Ctrl+Shift+K or W,Space,A\n· Save / Load: save the current layout as a named preset, or load/delete presets\n· One-key: master switch. Keys with “One-key switch” checked are hidden when the master switch is off and restored when it is on again\n· Full: 5-row compact keyboard. When Caps is lit, Shift stays held; tap again to turn it off. “Sym” switches to the symbols/F1-F12 page. Drag the top ≡ to move; pinch with two fingers to resize\n· Mouse: toggle the virtual mouse; drag with one finger on the touchpad to move the cursor, tap for left click, two-finger tap for right click, two-finger swipe to scroll, long-press to toggle left-button hold\n· Mouse keys: always available, positioned at the virtual mouse\n\nInjection methods:\n· Keyboard event: cloud gaming / keyboard-enabled apps, can be held down\n· Touch tap: native mobile games; the position stays touched while the key is held\n· Mouse button: sends mouse button events at the virtual mouse position\n\nPresets: the home screen can save/load multiple key layouts, export to the clipboard, or import from the clipboard</string>
+    <string name="help_note">Keys are fixed to a dark background with a white border and do not change color when pressed</string>
+    <string name="about_link">About the app &amp; author  ›</string>
+    <string name="about_link_with_version">%1$s · About the app &amp; author  ›</string>
+
+    <!-- Status -->
+    <string name="shizuku_not_running">Shizuku: not running</string>
+    <string name="shizuku_running_unauthorized">Shizuku: running · not authorized</string>
+    <string name="shizuku_authorized_status">Shizuku: authorized</string>
+    <string name="status_detail">Injection channel: %1$s　·　Overlay: %2$s\nFloating keys: %3$s</string>
+    <string name="status_ready">ready</string>
+    <string name="status_not_ready">not ready</string>
+    <string name="status_overlay_granted">granted</string>
+    <string name="status_overlay_not_granted">not granted</string>
+    <string name="status_keys_showing">showing</string>
+    <string name="status_keys_not_showing">not shown</string>
+    <string name="keys_count_saved">Keys: %1$d</string>
+
+    <!-- Main screen toasts / dialogs -->
+    <string name="toast_shizuku_authorized">Shizuku authorized</string>
+    <string name="toast_shizuku_denied">Shizuku authorization denied</string>
+    <string name="toast_install_shizuku">Please install and start Shizuku first</string>
+    <string name="toast_shizuku_version_low">Shizuku version too low (11+ required)</string>
+    <string name="toast_already_authorized">Already authorized</string>
+    <string name="toast_allow_in_shizuku">Please allow this app manually in the Shizuku app</string>
+    <string name="toast_need_shizuku_auth">Please complete Shizuku authorization first</string>
+    <string name="toast_need_overlay">Please grant overlay permission first</string>
+    <string name="toast_keys_shown">Virtual keys shown; switch to the game to use them</string>
+    <string name="toast_layout_cleared">Custom layout cleared; the default layout will be restored next time</string>
+    <string name="toast_ime_disabled">IME blocking disabled; system IME restored</string>
+    <string name="toast_ime_enabled">Enabled: system IME is blocked while virtual keys are shown</string>
+    <string name="toast_ime_enabled_later">Enabled; takes effect after virtual keys are shown</string>
+    <string name="toast_no_keys">No custom keys yet; show the virtual keys and add some first</string>
+    <string name="preset_name_hint">Preset name, e.g. Cloud gaming</string>
+    <string name="preset_default_name">Preset %1$d</string>
+    <string name="dialog_save_current_keys">Save current keys</string>
+    <string name="action_save">Save</string>
+    <string name="toast_name_empty">Name cannot be empty</string>
+    <string name="toast_preset_saved">Preset “%1$s” saved</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="toast_no_presets">No presets saved yet</string>
+    <string name="dialog_load_preset">Load preset</string>
+    <string name="dialog_delete_preset">Delete preset</string>
+    <string name="action_delete">Delete</string>
+    <string name="toast_preset_deleted">Deleted “%1$s”</string>
+    <string name="toast_preset_empty">This preset is empty</string>
+    <string name="toast_preset_loaded">Preset “%1$s” loaded</string>
+    <string name="toast_nothing_to_export">No keys to export</string>
+    <string name="clip_label_config">Virtual keypad configuration</string>
+    <string name="toast_config_copied">Configuration copied to clipboard</string>
+    <string name="toast_clipboard_empty">Clipboard is empty</string>
+    <string name="toast_invalid_config">The clipboard does not contain a valid key configuration</string>
+    <string name="dialog_import_config">Import configuration</string>
+    <string name="dialog_import_message">Importing will overwrite the current key layout. Continue?</string>
+    <string name="action_import">Import</string>
+    <string name="toast_config_imported">Configuration imported</string>
+
+    <!-- Overlay toolbar -->
+    <string name="toast_default_restored">Default layout restored</string>
+    <string name="toolbar_edit">Edit</string>
+    <string name="toolbar_done">Done</string>
+    <string name="toolbar_add">＋</string>
+    <string name="toolbar_macro">Macro</string>
+    <string name="toolbar_macro_active">Macro…</string>
+    <string name="toolbar_close">×</string>
+    <string name="toolbar_save">Save</string>
+    <string name="toolbar_load">Load</string>
+    <string name="toolbar_full">Full</string>
+    <string name="toolbar_full_on">Full on</string>
+    <string name="toolbar_one_key_on">One-key on</string>
+    <string name="toolbar_one_key_off">One-key off</string>
+    <string name="toolbar_mouse">Mouse</string>
+    <string name="toolbar_mouse_on">Mouse on</string>
+    <string name="panel_handle">≡  Full keyboard</string>
+    <string name="toast_bind_exited">Exited</string>
+    <string name="toast_bind_prompt">Tap a custom key to set a macro for it</string>
+    <string name="macro_hint">e.g. Ctrl+Shift+K  or  W,Space,A</string>
+    <string name="dialog_macro_title">Macro for key “%1$s”</string>
+    <string name="dialog_macro_message">Separate steps with commas or spaces; + within a step means press together. Leave empty to disable the macro</string>
+    <string name="toast_macro_invalid">Could not parse this macro; check the key names and try again</string>
+    <string name="toast_macro_disabled">Macro disabled</string>
+    <string name="toast_macro_saved">Macro saved</string>
+    <string name="toast_toolbar_hidden">Control menu hidden; reopen the app to restore it</string>
+    <string name="toast_anchor_warning">The output point overlaps a floating key; touch may fail. Drag the crosshair to the game’s joystick in edit mode</string>
+    <string name="toast_inject_failed">Injection failed: %1$s</string>
+    <string name="unknown_reason">unknown reason</string>
+    <string name="toast_mouse_inject_failed">Mouse event injection failed: %1$s</string>
+    <string name="toast_layout_saved">Layout saved</string>
+    <string name="toast_edit_mode">Edit mode: drag to arrange, tap to edit or delete</string>
+    <string name="key_menu_title">Key “%1$s”</string>
+    <string name="key_menu_edit">Edit key / label / method</string>
+    <string name="key_menu_delete">Delete this key</string>
+    <string name="dialog_delete_key">Delete key</string>
+    <string name="dialog_delete_key_message">Delete “%1$s”?</string>
+    <string name="action_delete_confirm">Delete</string>
+    <string name="dialog_stick_mode_option_key">Key mode (outputs WASD, for cloud gaming)</string>
+    <string name="dialog_stick_mode_option_touch">Touch mode (injects a finger at the output point, native games)</string>
+    <string name="toast_anchor_reset">The output point will return to the right of the joystick after saving; drag the crosshair in edit mode to fine-tune</string>
+    <string name="shape_rounded">Rounded square</string>
+    <string name="shape_circle">Circle</string>
+    <string name="dialog_add_key">Add virtual key</string>
+    <string name="dialog_edit_key">Edit key</string>
+    <string name="action_add">Add</string>
+    <string name="toast_invalid_keycode">Invalid key value; enter a number between 1 and 400</string>
+    <string name="toast_hidden_by_one_key">“%1$s” is controlled by the one-key switch; hidden because the master switch is off</string>
+    <string name="toast_one_key_on">One-key switch on: selected keys shown</string>
+    <string name="toast_one_key_off">One-key switch off: selected keys hidden</string>
+    <string name="toast_game_keyboard_on">Full keyboard opened; drag the top handle to move it</string>
+    <string name="toast_game_keyboard_off">Full keyboard closed</string>
+    <string name="toast_mouse_off">Virtual mouse disabled</string>
+    <string name="toast_mouse_fullscreen_hint">Drag anywhere to move the mouse; tap to left-click</string>
+    <string name="toast_mouse_pad_hint">Drag the touchpad to move the mouse; tap the touchpad to click</string>
+    <string name="toast_switched_fullscreen">Switched to full-screen drag</string>
+    <string name="toast_switched_touchpad">Switched to touchpad</string>
+    <string name="touchpad_hint">Drag with one finger · tap for left click\nTwo-finger tap for right click · two-finger swipe to scroll\nLong press to toggle left-button hold</string>
+    <string name="toast_left_held">Left button held; tap the touchpad to release</string>
+    <string name="toast_left_released">Left button released</string>
+    <string name="panel_key_symbols">Sym</string>
+    <string name="panel_key_space">Space</string>
+
+    <!-- Key catalog -->
+    <string name="key_anchor">Anchor</string>
+    <string name="key_space">Space</string>
+    <string name="key_enter">Enter</string>
+    <string name="key_backspace">Backspace</string>
+    <string name="key_dpad_center">OK</string>
+    <string name="key_back">Back</string>
+    <string name="key_home">Home</string>
+    <string name="key_menu">Menu</string>
+    <string name="key_numpad_0">Num 0</string>
+    <string name="key_numpad_1">Num 1</string>
+    <string name="key_numpad_2">Num 2</string>
+    <string name="key_numpad_3">Num 3</string>
+    <string name="key_numpad_4">Num 4</string>
+    <string name="key_numpad_5">Num 5</string>
+    <string name="key_numpad_6">Num 6</string>
+    <string name="key_numpad_7">Num 7</string>
+    <string name="key_numpad_8">Num 8</string>
+    <string name="key_numpad_9">Num 9</string>
+    <string name="key_numpad_add">Num +</string>
+    <string name="key_numpad_subtract">Num -</string>
+    <string name="key_numpad_multiply">Num *</string>
+    <string name="key_numpad_divide">Num /</string>
+    <string name="key_numpad_dot">Num .</string>
+    <string name="key_numpad_enter">Num Enter</string>
+    <string name="key_custom">Custom key value…</string>
+    <string name="key_mouse_left">Left mouse</string>
+    <string name="key_mouse_right">Right mouse</string>
+    <string name="key_mouse_middle">Middle mouse</string>
+    <string name="key_wheel_up">Wheel up</string>
+    <string name="key_wheel_down">Wheel down</string>
+    <string name="key_joystick">Virtual joystick</string>
+    <string name="key_fallback">Key %1$d</string>
+
+    <!-- About screen -->
+    <string name="about_back">‹ Back</string>
+    <string name="about_title">About</string>
+    <string name="version_label">Version %1$s</string>
+    <string name="version_label_default">Version</string>
+    <string name="about_desc">Injects key, touch and mouse events through Shizuku with shell privileges, turning your phone into a virtual keyboard and mouse for cloud gaming / remote desktop.</string>
+    <string name="author_label">Author</string>
+    <string name="author_name">Nameless Jimi</string>
+    <string name="bili_uid">Bilibili UID 604149349</string>
+    <string name="btn_open_bilibili">Open Bilibili profile</string>
+    <string name="btn_copy_uid">Copy UID</string>
+    <string name="about_footer">This app requests no network permission; all settings are stored on this device only.</string>
+    <string name="toast_no_browser">No browser available</string>
+    <string name="toast_uid_copied">UID copied</string>
+    <string name="clip_label_bili_uid">Bilibili UID</string>
+
+    <!-- Key dialog -->
+    <string name="dialog_key_section_key">Key</string>
+    <string name="dialog_key_label_section">Text shown on the key</string>
+    <string name="dialog_key_label_hint">e.g. W, Jump, Attack</string>
+    <string name="dialog_key_size_section">Key size (dp, 40 ~ 120)</string>
+    <string name="dialog_key_size_hint">62</string>
+    <string name="dialog_key_shape_section">Key shape</string>
+    <string name="cb_one_key">One-key switch (hidden when the toolbar master switch is off)</string>
+    <string name="cb_latch">Latch key (tap to hold, tap again to release; normal keys only)</string>
+    <string name="dialog_key_custom_code_section">Custom key value (Android KeyEvent keyCode)</string>
+    <string name="dialog_key_custom_code_hint">e.g. 66 (Enter), 29 (A), 4 (Back)</string>
+    <string name="dialog_key_stick_mode_section">Joystick mode</string>
+    <string name="dialog_key_stick_dirs_section">Direction key values (Up W=51 / Down S=47 / Left A=29 / Right D=32)</string>
+    <string name="hint_up">Up</string>
+    <string name="hint_down">Down</string>
+    <string name="hint_left">Left</string>
+    <string name="hint_right">Right</string>
+    <string name="btn_anchor_center">Touch output point: reset to default position (right of the joystick)</string>
+    <string name="stick_touch_desc">Touch mode injects a finger at the output point to push the game’s own joystick. In edit mode a yellow crosshair appears on screen; drag it to the center of the game joystick. By default it sits to the right of the joystick so the joystick window does not cover it.</string>
+    <string name="inject_title">Injection method</string>
+    <string name="rb_key">Keyboard event (cloud gaming / keyboard-enabled apps, can be held)</string>
+    <string name="rb_touch">Touch tap (native mobile games; taps at the key’s screen position)</string>
+    <string name="inject_hint">If a key does nothing in the game, change this key to “Touch tap”.</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_name">Virtual keys</string>
+    <string name="notification_running_title">Hajimi Virtual Keypad is running</string>
+    <string name="notification_running_text">Virtual keys are shown; tap to return to the app</string>
+
+    <!-- Injector errors -->
+    <string name="injector_shizuku_not_connected">Shizuku service not connected</string>
+    <string name="injector_no_input_service">Cannot get the input system service</string>
+    <string name="injector_as_interface_null">IInputManager.asInterface returned null</string>
+    <string name="injector_init_failed">Initialization failed: %1$s: %2$s</string>
+    <string name="injector_rejected">System rejected the injection (injectInputEvent returned false)</string>
+    <string name="injector_exception">Injection exception: %1$s: %2$s</string>
+</resources>
