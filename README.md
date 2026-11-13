@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ 下载 APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6/shizuku-keypad-1.6.apk)** ·
+**[⬇ 下载 APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6.1/shizuku-keypad-1.6.1.apk)** ·
 [源码](https://github.com/114514hhha233/shizuku-keypad) ·
 [问题反馈](https://github.com/114514hhha233/shizuku-keypad/issues)
 
@@ -67,7 +67,7 @@
 - 灵敏度倍率 50%–250%，拖拽锁定（左键按住）可选全屏拖动。
 
 ### 编辑与配置
-- 工具栏：编辑模式、鼠标、整块键盘、一键开关、宏绑定、透明度。
+- 工具栏：编辑模式、鼠标、整块键盘、一键开关、全关/全开（一键隐藏屏幕上所有按键）、宏绑定、透明度。
 - 编辑模式下直接拖动按键、点按键改配置、长按删除。
 - 布局、透明度、灵敏度、开关状态全部用 `SharedPreferences + JSON` 持久化；按键位置存 0–1 比例，旋转屏幕、换分辨率都不会错位。
 - 预设管理与配置导入导出。
@@ -126,7 +126,7 @@ IInputManager.injectInputEvent(event, MODE_WAIT_FOR_FINISH)
 
 ## 安装与使用
 
-1. 从 [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) 下载 `shizuku-keypad-1.6.apk` 并安装。
+1. 从 [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) 下载 `shizuku-keypad-1.6.1.apk` 并安装。
 2. 安装 [Shizuku](https://shizuku.rikka.app/)，并按官方说明通过 `adb shell` 或 root 启动服务。
 3. 打开应用，授予「悬浮窗」和「通知」权限。
 4. 在应用内点「授权 Shizuku」，允许后状态变为已连接。

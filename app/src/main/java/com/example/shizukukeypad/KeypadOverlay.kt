@@ -86,6 +86,7 @@ class KeypadOverlay(private val context: Context) {
     private var btnGame: TextView? = null
     private var btnOneKey: TextView? = null
     private var btnMacro: TextView? = null
+    private var btnAllKeys: TextView? = null
 
     /** 菜单绑定模式：0 正常，1 点按键设置宏 */
     private var bindMode = 0
@@ -148,6 +149,9 @@ class KeypadOverlay(private val context: Context) {
 
     /** 一键开关总开关：关闭时隐藏所有勾选了「一键开关」的按键 */
     private var oneKeyOn = true
+
+    /** 全关：临时隐藏屏幕上所有按键（不看「一键开关」勾选），再点一下恢复 */
+    private var allKeysOff = false
 
     private var cursorView: View? = null
     private var cursorParams: WindowManager.LayoutParams? = null
@@ -360,6 +364,7 @@ class KeypadOverlay(private val context: Context) {
         }
         removeAllWindows()
         bindMode = 0
+        allKeysOff = false
         keys.clear()
         mouseOn = false
         editMode = false
@@ -539,6 +544,13 @@ class KeypadOverlay(private val context: Context) {
         btnEdit = barButton(getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit), 46) { toggleEdit() }.also { row1.addView(it) }
         row1.addView(barButton(getString(R.string.toolbar_add), 30) { showKeyDialog(null) })
         btnMacro = barButton(getString(R.string.toolbar_macro), 36) { toggleBindMode(1) }.also { row1.addView(it) }
+        btnAllKeys = barButton(
+            getString(if (allKeysOff) R.string.toolbar_all_on else R.string.toolbar_all_off),
+            40
+        ) {
+            setAllKeysOff(!allKeysOff)
+            refreshBarLabels()
+        }.also { row1.addView(it) }
         row1.addView(barButton(getString(R.string.toolbar_close), 28) { OverlayService.send(context, OverlayService.ACTION_HIDE) })
 
         row2.addView(barButton(getString(R.string.toolbar_save), 30) { promptSavePreset() })
@@ -574,6 +586,7 @@ class KeypadOverlay(private val context: Context) {
         btnMouse?.text = getString(if (mouseOn) R.string.toolbar_mouse_on else R.string.toolbar_mouse)
         btnEdit?.text = getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit)
         btnMacro?.text = getString(if (bindMode == 1) R.string.toolbar_macro_active else R.string.toolbar_macro)
+        btnAllKeys?.text = getString(if (allKeysOff) R.string.toolbar_all_on else R.string.toolbar_all_off)
     }
 
     /** 进入/退出按键绑定模式：菜单点一下，接下来点的那个自定义按键生效 */
@@ -931,6 +944,7 @@ class KeypadOverlay(private val context: Context) {
         }
         runCatching { wm.addView(v, p) }
         keyViews[key.id] = v
+        if (allKeysOff) v.visibility = View.GONE
         applyKeyTouchability()
     }
 
@@ -1257,6 +1271,7 @@ class KeypadOverlay(private val context: Context) {
             val v = anchorViews[key.id]
             if (v == null) addAnchorMarker(key) else placeAnchorMarker(key, v)
         }
+        if (allKeysOff) anchorViews.values.forEach { it.visibility = View.GONE }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1544,6 +1559,36 @@ class KeypadOverlay(private val context: Context) {
             if (!isKeyVisible(key)) latchedKeys.remove(key.id)
         }
         if (editMode) syncAnchorMarkers()
+    }
+
+    /**
+     * 全关：不看「一键开关」勾选，直接把屏幕上所有按键（含摇杆、输出点准星）藏起来。
+     * 窗口不销毁，只置 GONE，恢复时立刻还原，不影响按次、位置和注入状态。
+     */
+    private fun setAllKeysOff(off: Boolean) {
+        if (allKeysOff == off) return
+        allKeysOff = off
+        if (off) {
+            // 关闭前松开所有正在按的键，避免隐藏后游戏里卡键
+            releaseLatchedKeys()
+            releaseAllJoysticks()
+            keys.forEach { key ->
+                keyViews[key.id]?.let { releaseViewPointers(it) }
+                repeat(pressCounts[key.id] ?: 0) { releaseKey(key) }
+            }
+        }
+        applyAllKeysVisibility()
+        bringToolbarToFront()
+        toast(
+            if (off) getString(R.string.toast_all_keys_off)
+            else getString(R.string.toast_all_keys_on)
+        )
+    }
+
+    private fun applyAllKeysVisibility() {
+        val vis = if (allKeysOff) View.GONE else View.VISIBLE
+        keyViews.values.forEach { it.visibility = vis }
+        anchorViews.values.forEach { it.visibility = vis }
     }
 
     private inner class KeyTouch(

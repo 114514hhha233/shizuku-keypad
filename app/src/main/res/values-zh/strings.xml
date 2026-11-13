@@ -102,6 +102,8 @@
     <string name="toolbar_full_on">整块开</string>
     <string name="toolbar_one_key_on">一键开</string>
     <string name="toolbar_one_key_off">一键关</string>
+    <string name="toolbar_all_off">全关</string>
+    <string name="toolbar_all_on">全开</string>
     <string name="toolbar_mouse">鼠标</string>
     <string name="toolbar_mouse_on">鼠标开</string>
     <string name="panel_handle">≡  整块键盘</string>
@@ -138,6 +140,8 @@
     <string name="toast_hidden_by_one_key">「%1$s」受一键开关控制，当前总开关关闭，已隐藏</string>
     <string name="toast_one_key_on">一键开关已打开：勾选的按键已显示</string>
     <string name="toast_one_key_off">一键开关已关闭：勾选的按键已隐藏</string>
+    <string name="toast_all_keys_off">所有按键已隐藏</string>
+    <string name="toast_all_keys_on">所有按键已显示</string>
     <string name="toast_game_keyboard_on">整块键盘已打开，拖顶部三条杠可以移动</string>
     <string name="toast_game_keyboard_off">整块键盘已关闭</string>
     <string name="toast_mouse_off">虚拟鼠标已关闭</string>

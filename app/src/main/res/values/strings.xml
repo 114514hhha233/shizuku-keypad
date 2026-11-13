@@ -102,6 +102,8 @@
     <string name="toolbar_full_on">Full on</string>
     <string name="toolbar_one_key_on">One-key on</string>
     <string name="toolbar_one_key_off">One-key off</string>
+    <string name="toolbar_all_off">All off</string>
+    <string name="toolbar_all_on">All on</string>
     <string name="toolbar_mouse">Mouse</string>
     <string name="toolbar_mouse_on">Mouse on</string>
     <string name="panel_handle">≡  Full keyboard</string>
@@ -138,6 +140,8 @@
     <string name="toast_hidden_by_one_key">“%1$s” is controlled by the one-key switch; hidden because the master switch is off</string>
     <string name="toast_one_key_on">One-key switch on: selected keys shown</string>
     <string name="toast_one_key_off">One-key switch off: selected keys hidden</string>
+    <string name="toast_all_keys_off">All keys hidden</string>
+    <string name="toast_all_keys_on">All keys shown</string>
     <string name="toast_game_keyboard_on">Full keyboard opened; drag the top handle to move it</string>
     <string name="toast_game_keyboard_off">Full keyboard closed</string>
     <string name="toast_mouse_off">Virtual mouse disabled</string>

@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6/shizuku-keypad-1.6.apk)** ·
+**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6.1/shizuku-keypad-1.6.1.apk)** ·
 [Source](https://github.com/114514hhha233/shizuku-keypad) ·
 [Issues](https://github.com/114514hhha233/shizuku-keypad/issues)
 
@@ -67,7 +67,7 @@ So: **keep your thumb on the thumb rest (or joystick, or any key) and your other
 - Sensitivity 50%–250%; drag-lock (left button held) can optionally drag across the whole screen.
 
 ### Editing & configuration
-- Toolbar: edit mode, mouse, full keyboard, toggle, macro binding, opacity.
+- Toolbar: edit mode, mouse, full keyboard, toggle, all-off/all-on (hide every key at once), macro binding, opacity.
 - In edit mode, drag keys, tap to edit, long-press to delete.
 - Layout, opacity, sensitivity and toggle states persist via `SharedPreferences + JSON`; key positions are stored as 0–1 ratios, so rotation and resolution changes never misplace them.
 - Preset management and config import/export.
@@ -126,7 +126,7 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 
 ## Install & usage
 
-1. Download `shizuku-keypad-1.6.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
+1. Download `shizuku-keypad-1.6.1.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
 2. Install [Shizuku](https://shizuku.rikka.app/) and start its service via `adb shell` or root as described in its documentation.
 3. Open the app and grant "Display over other apps" and notification permissions.
 4. Tap "Authorize Shizuku" in the app; the status should become connected.
