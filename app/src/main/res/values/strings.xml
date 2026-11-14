@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App / services -->
-    <string name="app_name">Hajimi Virtual Keypad</string>
+    <string name="app_name">HJM Keypad</string>
     <string name="ime_service_name">Blank Keypad IME</string>
 
     <!-- Main screen -->
@@ -31,10 +31,44 @@
     <string name="block_ime">Block system IME</string>
     <string name="block_ime_desc">On: while virtual keys are shown, a built-in blank IME takes over so the system keyboard cannot cover the screen or turn letters into Chinese\nRestores the previous IME when keys are hidden or the app exits\nRequires Shizuku authorization</string>
     <string name="section_help">Instructions</string>
-    <string name="help_text">① Start Shizuku and authorize it, then grant overlay permission\n② Tap “Show virtual keys” and switch to the game\n\nToolbar:\n· ≡ Drag the whole toolbar; long-press to hide the control menu (reopen the app to restore)\n· Edit: keys can be dragged freely; tap a key to change its key/label/injection method or delete it\n· ＋: Add a key; letters, digits, F1-F12, arrow keys, numpad and mouse keys are built in, and a custom key code can be entered\n· Macro: tap once and then tap a custom key, enter a sequence such as Ctrl+Shift+K or W,Space,A\n· Save / Load: save the current layout as a named preset, or load/delete presets\n· One-key: master switch. Keys with “One-key switch” checked are hidden when the master switch is off and restored when it is on again\n· Full: 5-row compact keyboard. When Caps is lit, Shift stays held; tap again to turn it off. “Sym” switches to the symbols/F1-F12 page. Drag the top ≡ to move; pinch with two fingers to resize\n· Mouse: toggle the virtual mouse; drag with one finger on the touchpad to move the cursor, tap for left click, two-finger tap for right click, two-finger swipe to scroll, long-press to toggle left-button hold\n· Mouse keys: always available, positioned at the virtual mouse\n\nInjection methods:\n· Keyboard event: cloud gaming / keyboard-enabled apps, can be held down\n· Touch tap: native mobile games; the position stays touched while the key is held\n· Mouse button: sends mouse button events at the virtual mouse position\n\nPresets: the home screen can save/load multiple key layouts, export to the clipboard, or import from the clipboard</string>
+    <string name="help_text">① Start Shizuku and authorize it, then grant overlay permission\n② Turn on “Show floating keys” and switch to the game\n\nToolbar:\n· ≡ Drag the whole toolbar; long-press to hide the control menu (reopen the app to restore)\n· Edit: keys can be dragged freely; tap a key to change its key/label/injection method or delete it\n· ＋: Add a key; letters, digits, F1-F12, arrow keys, numpad and mouse keys are built in, and a custom key code can be entered\n· Macro: tap once and then tap a custom key, enter a sequence such as Ctrl+Shift+K or W,Space,A\n· Save / Load: save the current layout as a named preset, or load/delete presets\n· One-key: master switch. Keys with “One-key switch” checked are hidden when the master switch is off and restored when it is on again\n· Full: 5-row compact keyboard. When Caps is lit, Shift stays held; tap again to turn it off. “Sym” switches to the symbols/F1-F12 page. Drag the top ≡ to move; pinch with two fingers to resize\n· Mouse: toggle the virtual mouse; drag with one finger on the touchpad to move the cursor, tap for left click, two-finger tap for right click, two-finger swipe to scroll, long-press to toggle left-button hold\n· Mouse keys: always available, positioned at the virtual mouse\n\nInjection methods:\n· Keyboard event: cloud gaming / keyboard-enabled apps, can be held down\n· Touch tap: native mobile games; the position stays touched while the key is held\n· Mouse button: sends mouse button events at the virtual mouse position\n\nPresets: the home screen can save/load multiple key layouts, export to the clipboard, or import from the clipboard</string>
     <string name="help_note">Keys are fixed to a dark background with a white border and do not change color when pressed</string>
     <string name="about_link">About the app &amp; author  ›</string>
     <string name="about_link_with_version">%1$s · About the app &amp; author  ›</string>
+
+    <!-- Main screen (Material 3) -->
+    <string name="section_status">Status</string>
+    <string name="section_control">Controls</string>
+    <string name="label_shizuku_service">Shizuku service</string>
+    <string name="label_overlay_permission">Overlay permission</string>
+    <string name="state_checking">Checking…</string>
+    <string name="state_authorized">Authorized</string>
+    <string name="state_not_authorized">Not authorized</string>
+    <string name="state_not_running">Not running</string>
+    <string name="state_granted">Granted</string>
+    <string name="state_not_granted">Not granted</string>
+    <string name="switch_show_overlay">Show floating keys</string>
+    <string name="btn_open_overlay_settings">Open overlay settings</string>
+
+    <!-- Help screen -->
+    <string name="help_entry_title">Help &amp; troubleshooting</string>
+    <string name="help_entry_desc">Keys not working, native touch not dragging, IME covering the screen…</string>
+    <string name="help_title">Help &amp; troubleshooting</string>
+    <string name="help_intro">Common issues and fixes, grouped by symptom.</string>
+    <string name="help_q1_title">A key does nothing</string>
+    <string name="help_q1_body">· If a key does nothing in the game, tap “Edit” in the toolbar, tap the key and switch its injection method to “Touch tap”; keep “Keyboard event” for cloud gaming.\n· Make sure both dots on the status card are green.\n· In multi-touch mode, press the key’s actual position; you can still press keys while dragging the camera.</string>
+    <string name="help_q2_title">New keys do not respond while dragging the camera</string>
+    <string name="help_q2_body">This is not a permission issue but Android touch ownership: once the first finger lands on the game window, other fingers belong to the game and overlay keys never receive them.\nTurn on “Multi-touch” in the toolbar: keys stop stealing touches and are triggered by listening to raw touch coordinates, so you can press new keys while dragging.\nIn multi-touch mode the mouse left/right/middle buttons and wheel also work, and tapping an empty area acts as a left click. The joystick is not supported in multi-touch mode yet.</string>
+    <string name="help_q3_title">Native touch stops dragging after enabling full-screen mouse</string>
+    <string name="help_q3_body">In window mode, full-screen mouse must cover the screen with a touch layer to receive drags, so native touch is blocked — an unavoidable system-level trade-off.\nMulti-touch mode removes that layer, so native touch reaches the game. However, if the game switches to “mouse look” after receiving mouse movement, the camera stops following touch; that is the game’s own input-mode switch, not the key layer stealing touches.\nIf you need native touch, tap “Mouse” in the toolbar to turn the virtual mouse off.</string>
+    <string name="help_q4_title">IME covers the screen / letters turn into Chinese</string>
+    <string name="help_q4_body">Turn on “Block system IME” on the main screen: a built-in blank IME takes over while keys are shown, and the previous IME is restored when keys are hidden or the app exits.\nRequires Shizuku authorization.</string>
+    <string name="help_q5_title">Shizuku or overlay permission is not ready</string>
+    <string name="help_q5_body">Both dots on the status card must be green.\n· Shizuku requires version 11 or newer, and must be started again after a reboot.\n· Tap “Authorize Shizuku” when unauthorized, and “Grant overlay permission” when it is not granted.</string>
+    <string name="help_q6_title">Change key position, size and key code</string>
+    <string name="help_q6_body">Tap “Edit” in the toolbar to drag keys; tap a key to change its key code, label, size, shape, injection method, or delete it.\n“＋” adds keys: letters, digits, F1-F12, arrows, numpad and mouse buttons are built in. “Macro” binds a key sequence to one key.</string>
+    <string name="help_q7_title">Presets, backup and restore</string>
+    <string name="help_q7_body">“Presets” on the main screen saves/loads multiple layouts; the exported JSON can be backed up or shared via the clipboard, and importing overwrites the current layout.\n“Reset layout” clears custom keys.</string>
 
     <!-- Status -->
     <string name="shizuku_not_running">Shizuku: not running</string>
@@ -104,6 +138,10 @@
     <string name="toolbar_one_key_off">One-key off</string>
     <string name="toolbar_all_off">All off</string>
     <string name="toolbar_all_on">All on</string>
+    <string name="toolbar_hot_off">Windows</string>
+    <string name="toolbar_hot_on">Multi-touch</string>
+    <string name="toast_hot_on">Multi-touch on: keys no longer block touches</string>
+    <string name="toast_hot_off">Window mode: each key takes its own touch</string>
     <string name="toolbar_mouse">Mouse</string>
     <string name="toolbar_mouse_on">Mouse on</string>
     <string name="panel_handle">≡  Full keyboard</string>
@@ -207,6 +245,9 @@
 
     <!-- Key dialog -->
     <string name="dialog_key_section_key">Key</string>
+    <string name="dialog_key_subtitle">Tune the key, its look and how it is injected</string>
+    <string name="dialog_key_group_look">Appearance</string>
+    <string name="dialog_key_group_behavior">Behavior</string>
     <string name="dialog_key_label_section">Text shown on the key</string>
     <string name="dialog_key_label_hint">e.g. W, Jump, Attack</string>
     <string name="dialog_key_size_section">Key size (dp, 40 ~ 120)</string>
@@ -233,7 +274,7 @@
 
     <!-- Notification -->
     <string name="notification_channel_name">Virtual keys</string>
-    <string name="notification_running_title">Hajimi Virtual Keypad is running</string>
+    <string name="notification_running_title">HJM Keypad is running</string>
     <string name="notification_running_text">Virtual keys are shown; tap to return to the app</string>
 
     <!-- Injector errors -->

@@ -21,6 +21,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewTreeObserver
@@ -28,14 +29,15 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import rikka.shizuku.Shizuku
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -81,12 +83,16 @@ class KeypadOverlay(private val context: Context) {
 
     private var toolbar: LinearLayout? = null
     private var toolbarParams: WindowManager.LayoutParams? = null
-    private var btnEdit: TextView? = null
-    private var btnMouse: TextView? = null
-    private var btnGame: TextView? = null
-    private var btnOneKey: TextView? = null
-    private var btnMacro: TextView? = null
-    private var btnAllKeys: TextView? = null
+    private var btnEdit: ToolButton? = null
+    private var btnMouse: ToolButton? = null
+    private var btnHot: ToolButton? = null
+
+    /** 热区模式总开关：true 时所有按键窗口不可触摸，靠旁听触摸屏坐标触发 */
+    private var hotMode = false
+    private var btnGame: ToolButton? = null
+    private var btnOneKey: ToolButton? = null
+    private var btnMacro: ToolButton? = null
+    private var btnAllKeys: ToolButton? = null
 
     /** 菜单绑定模式：0 正常，1 点按键设置宏 */
     private var bindMode = 0
@@ -331,11 +337,13 @@ class KeypadOverlay(private val context: Context) {
         mouseGain = KeyStore.loadMouseGain(context) / 100f
         oneKeyOn = KeyStore.loadOneKeyOn(context)
         gameKeyboardOn = KeyStore.loadGameKeyboard(context)
+        hotMode = KeyStore.loadHotMode(context)
         loadOrSeedKeys()
         buildKeyWindows()
         buildToolbar()
         if (gameKeyboardOn) buildGameKeyboard()
         if (KeyStore.loadBlockIme(context)) ImeGuard.enter(context)
+        refreshEvdev()
     }
 
     /** 全局按键不透明度，30..100 */
@@ -356,6 +364,9 @@ class KeypadOverlay(private val context: Context) {
     fun hide() {
         dialog?.dismiss()
         dialog = null
+        releaseHotKeys()
+        EvdevTouch.listener = null
+        EvdevTouch.stop()
         clearTouchState()
         releasePanelKeys()
         worker.execute {
@@ -497,25 +508,67 @@ class KeypadOverlay(private val context: Context) {
 
     // ==================== 工具条 ====================
 
-    private fun barButton(text: String, widthDp: Int, onClick: () -> Unit): TextView =
-        TextView(themeCtx).apply {
-            this.text = text
-            textSize = 12f
-            setTextColor(Color.WHITE)
+    /**
+     * 工具条按钮：上图标、下小字的两行结构，比纯文字更容易一眼认出来。
+     * text 直接改下面那行，active 用来高亮当前开启的功能。
+     */
+    private inner class ToolButton(
+        glyph: String,
+        widthDp: Int,
+        onClick: () -> Unit
+    ) : LinearLayout(themeCtx) {
+
+        private val glyphView = TextView(themeCtx)
+        private val labelView = TextView(themeCtx)
+
+        var text: CharSequence
+            get() = labelView.text
+            set(value) {
+                labelView.text = value
+            }
+
+        var active: Boolean = false
+            set(value) {
+                field = value
+                render()
+            }
+
+        init {
+            orientation = VERTICAL
             gravity = Gravity.CENTER
-            background = rounded(0x33FFFFFF, 10)
-            layoutParams = LinearLayout.LayoutParams(dp(widthDp), dp(34)).apply { marginStart = dp(3) }
             isClickable = true
+            setPadding(dp(2), dp(4), dp(2), dp(3))
+            layoutParams = LinearLayout.LayoutParams(dp(widthDp), dp(46)).apply { marginStart = dp(3) }
+            glyphView.text = glyph
+            glyphView.textSize = 15f
+            glyphView.gravity = Gravity.CENTER
+            labelView.textSize = 9.5f
+            labelView.gravity = Gravity.CENTER
+            labelView.maxLines = 1
+            labelView.ellipsize = android.text.TextUtils.TruncateAt.END
+            addView(glyphView)
+            addView(labelView)
             setOnClickListener { onClick() }
+            render()
         }
+
+        private fun render() {
+            background = rounded(if (active) 0x4D5B7CFF else 0x14FFFFFF, 12)
+            glyphView.setTextColor(if (active) 0xFFC9D4FF.toInt() else 0xE8FFFFFF.toInt())
+            labelView.setTextColor(if (active) 0xFFC9D4FF.toInt() else 0x9EFFFFFF.toInt())
+        }
+    }
+
+    private fun barButton(glyph: String, text: String, widthDp: Int, onClick: () -> Unit): ToolButton =
+        ToolButton(glyph, widthDp, onClick).apply { this.text = text }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun buildToolbar() {
         val bar = LinearLayout(themeCtx).apply {
             orientation = LinearLayout.VERTICAL
-            background = rounded(0xE61B1B1B.toInt(), 18, 0x44FFFFFF)
-            setPadding(dp(8), dp(5), dp(8), dp(5))
-            elevation = dp(6).toFloat()
+            background = rounded(0xF2151A24.toInt(), 20, 0x26FFFFFF)
+            setPadding(dp(7), dp(5), dp(7), dp(5))
+            elevation = dp(8).toFloat()
         }
         val row1 = LinearLayout(themeCtx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -534,36 +587,45 @@ class KeypadOverlay(private val context: Context) {
 
         val handle = TextView(themeCtx).apply {
             text = "≡"
-            textSize = 18f
-            setTextColor(0xCCFFFFFF.toInt())
+            textSize = 19f
+            setTextColor(0xB3FFFFFF.toInt())
             gravity = Gravity.CENTER
             setPadding(dp(2), 0, dp(6), 0)
         }
         row1.addView(handle)
 
-        btnEdit = barButton(getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit), 46) { toggleEdit() }.also { row1.addView(it) }
-        row1.addView(barButton(getString(R.string.toolbar_add), 30) { showKeyDialog(null) })
-        btnMacro = barButton(getString(R.string.toolbar_macro), 36) { toggleBindMode(1) }.also { row1.addView(it) }
+        btnEdit = barButton("✎", getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit), 48) { toggleEdit() }.also { row1.addView(it) }
+        row1.addView(barButton("＋", getString(R.string.toolbar_add), 40) { showKeyDialog(null) })
+        btnMacro = barButton("⚡", getString(R.string.toolbar_macro), 46) { toggleBindMode(1) }.also { row1.addView(it) }
         btnAllKeys = barButton(
+            "◉",
             getString(if (allKeysOff) R.string.toolbar_all_on else R.string.toolbar_all_off),
-            40
+            48
         ) {
             setAllKeysOff(!allKeysOff)
             refreshBarLabels()
         }.also { row1.addView(it) }
-        row1.addView(barButton(getString(R.string.toolbar_close), 28) { OverlayService.send(context, OverlayService.ACTION_HIDE) })
+        row1.addView(barButton("✕", getString(R.string.toolbar_close), 40) { OverlayService.send(context, OverlayService.ACTION_HIDE) })
 
-        row2.addView(barButton(getString(R.string.toolbar_save), 30) { promptSavePreset() })
-        row2.addView(barButton(getString(R.string.toolbar_load), 30) { promptLoadPreset() })
-        btnGame = barButton(getString(if (gameKeyboardOn) R.string.toolbar_full_on else R.string.toolbar_full), 40) {
+        row2.addView(barButton("↓", getString(R.string.toolbar_save), 40) { promptSavePreset() })
+        row2.addView(barButton("↑", getString(R.string.toolbar_load), 40) { promptLoadPreset() })
+        btnGame = barButton("▤", getString(if (gameKeyboardOn) R.string.toolbar_full_on else R.string.toolbar_full), 46) {
             toggleGameKeyboard()
             refreshBarLabels()
         }.also { row2.addView(it) }
-        btnOneKey = barButton(getString(if (oneKeyOn) R.string.toolbar_one_key_on else R.string.toolbar_one_key_off), 40) {
+        btnOneKey = barButton("⊙", getString(if (oneKeyOn) R.string.toolbar_one_key_on else R.string.toolbar_one_key_off), 46) {
             setOneKeyOn(!oneKeyOn)
             refreshBarLabels()
         }.also { row2.addView(it) }
-        btnMouse = barButton(getString(if (mouseOn) R.string.toolbar_mouse_on else R.string.toolbar_mouse), 50) { toggleMousePad() }.also { row2.addView(it) }
+        btnMouse = barButton("↖", getString(if (mouseOn) R.string.toolbar_mouse_on else R.string.toolbar_mouse), 46) { toggleMousePad() }.also { row2.addView(it) }
+        // 长按鼠标键切换拖动方式：全屏滑动（默认） / 小触控板
+        btnMouse?.setOnLongClickListener {
+            toggleMouseProfile()
+            true
+        }
+        btnHot = barButton("◈", getString(if (hotMode) R.string.toolbar_hot_on else R.string.toolbar_hot_off), 54) {
+            setHotMode(!hotMode)
+        }.also { row2.addView(it) }
 
         val p = windowParams().apply {
             val saved = KeyStore.loadToolbar(context)
@@ -587,6 +649,32 @@ class KeypadOverlay(private val context: Context) {
         btnEdit?.text = getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit)
         btnMacro?.text = getString(if (bindMode == 1) R.string.toolbar_macro_active else R.string.toolbar_macro)
         btnAllKeys?.text = getString(if (allKeysOff) R.string.toolbar_all_on else R.string.toolbar_all_off)
+        btnHot?.text = getString(if (hotMode) R.string.toolbar_hot_on else R.string.toolbar_hot_off)
+        btnHot?.active = hotMode
+        btnEdit?.active = editMode
+        btnMacro?.active = bindMode == 1
+        btnMouse?.active = mouseOn
+        btnGame?.active = gameKeyboardOn
+        btnAllKeys?.active = allKeysOff
+        btnOneKey?.active = !oneKeyOn
+    }
+
+    /** 总开关：false = 每个按键一个独立窗口（原方案）；true = 热区模式（窗口不接收触摸） */
+    fun setHotMode(on: Boolean) {
+        if (hotMode == on) return
+        hotMode = on
+        KeyStore.saveHotMode(context, on)
+        releaseHotKeys()
+        // 切换时先把按下的状态清干净，避免卡键
+        worker.execute { ShizukuInjector.releaseAll() }
+        applyKeyTouchability()
+        // 全屏鼠标：热区模式下撤掉全屏触摸层，改由旁听坐标驱动光标
+        if (mouseOn && fullScreenDrag) {
+            if (on) removeDragLayer() else buildFullScreenLayer()
+        }
+        refreshEvdev()
+        refreshBarLabels()
+        toast(getString(if (on) R.string.toast_hot_on else R.string.toast_hot_off))
     }
 
     /** 进入/退出按键绑定模式：菜单点一下，接下来点的那个自定义按键生效 */
@@ -951,13 +1039,16 @@ class KeypadOverlay(private val context: Context) {
     /**
      * 触摸键在正常模式下是"穿透区"：窗口不可触摸，手指直接落到下面的游戏，
      * 由系统提供原生多点触控，没有注入、没有等待、不会被打断。
+     * 热区模式只让键盘按键穿透（靠旁听坐标触发）；
+     * 摇杆、鼠标按键仍保持可触摸，它们本来就要占住手指或接住按下。
      * 编辑模式必须可触摸，否则没法拖动/删除。
      */
     private fun applyKeyTouchability() {
         keyViews.forEach { (id, v) ->
             val key = keys.firstOrNull { it.id == id } ?: return@forEach
             val p = v.layoutParams as? WindowManager.LayoutParams ?: return@forEach
-            val passthrough = !editMode && key.type == KeyType.TOUCH
+            val hotKey = hotMode && (key.type == KeyType.KEY || key.type.isMouse)
+            val passthrough = !editMode && (key.type == KeyType.TOUCH || hotKey)
             val flags = if (passthrough) {
                 p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             } else {
@@ -1570,6 +1661,7 @@ class KeypadOverlay(private val context: Context) {
         allKeysOff = off
         if (off) {
             // 关闭前松开所有正在按的键，避免隐藏后游戏里卡键
+            hotPointers.clear()
             releaseLatchedKeys()
             releaseAllJoysticks()
             keys.forEach { key ->
@@ -1589,6 +1681,128 @@ class KeypadOverlay(private val context: Context) {
         val vis = if (allKeysOff) View.GONE else View.VISIBLE
         keyViews.values.forEach { it.visibility = vis }
         anchorViews.values.forEach { it.visibility = vis }
+    }
+
+    // ==================== 热区模式 ====================
+    //
+    // 工具栏总开关切换两种方案：
+    //   关 = 每个按键一个独立窗口（系统按坐标分发，第一指必须在按键上）
+    //   开 = 按键窗口一律不可触摸，靠 Shizuku 旁听触摸屏原始坐标触发按键
+    // 热区模式下按键不抢触摸，滑视角和按按键互不干扰。
+
+    // keyId -> 正在按住它的手指 id
+    private val hotPointers = HashMap<Long, Int>()
+
+    // 热区模式下的全屏滑动：每根手指的上一帧坐标，用来移动鼠标光标
+    private val hotCursorLast = HashMap<Int, PointF>()
+    // 每根手指累计移动距离：超过触摸阈值才算拖动，否则抬起时当作左键单击
+    private val hotCursorTravel = HashMap<Int, Float>()
+    private val hotCursorMoved = HashSet<Int>()
+    private var hotCursorInjectAt = 0L
+
+    private fun refreshEvdev() {
+        if (!hotMode || (keys.isEmpty() && !mouseOn)) {
+            EvdevTouch.listener = null
+            EvdevTouch.stop()
+            return
+        }
+        updateScreen()
+        EvdevTouch.screenW = screenW
+        EvdevTouch.screenH = screenH
+        @Suppress("DEPRECATION")
+        val r = runCatching { wm.defaultDisplay.rotation }.getOrDefault(Surface.ROTATION_0)
+        EvdevTouch.rotation = r
+        EvdevTouch.status = null
+        EvdevTouch.listener = EvdevTouch.Listener { action, id, x, y -> onEvdev(action, id, x, y) }
+        EvdevTouch.start()
+    }
+
+    private fun onEvdev(action: Int, id: Int, x: Float, y: Float) {
+        ui.post { handleHotTouch(action, id, x, y) }
+    }
+
+    private fun handleHotTouch(action: Int, id: Int, x: Float, y: Float) {
+        if (editMode || allKeysOff) return
+        // 全屏鼠标在热区里靠旁听坐标驱动：多指都能拖，单指轻点即左键
+        val mouseDrag = mouseOn && fullScreenDrag
+        if (action == EvdevTouch.UP) {
+            hotCursorLast.remove(id)?.let {
+                val moved = hotCursorMoved.remove(id)
+                hotCursorTravel.remove(id)
+                if (mouseDrag && !moved) {
+                    // 轻点空白处 = 左键单击（点击落在当前光标位置）
+                    worker.execute { injectMouse { doMouseKey(KeyType.MOUSE_LEFT) } }
+                } else if (mouseDrag) {
+                    injectHoverAtCursor()
+                }
+            }
+            hotCursorTravel.remove(id)
+            val iter = hotPointers.entries.iterator()
+            while (iter.hasNext()) {
+                val e = iter.next()
+                if (e.value == id) {
+                    iter.remove()
+                    keys.firstOrNull { k -> k.id == e.key }?.let { k -> releaseKey(k) }
+                }
+            }
+            return
+        }
+        if (action == EvdevTouch.MOVE) {
+            val last = hotCursorLast[id] ?: return
+            val dx = x - last.x
+            val dy = y - last.y
+            last.x = x
+            last.y = y
+            // 累计位移过阈值才算拖动：慢速滑动也不会被误判成点击
+            val travel = (hotCursorTravel[id] ?: 0f) + hypot(dx, dy)
+            hotCursorTravel[id] = travel
+            if (travel > touchSlop) hotCursorMoved.add(id)
+            if (id !in hotCursorMoved) return
+            mouseX = (mouseX + dx * mouseGain).coerceIn(0f, (screenW - 1).toFloat())
+            mouseY = (mouseY + dy * mouseGain).coerceIn(0f, (screenH - 1).toFloat())
+            moveCursorWindowToMouse()
+            val now = SystemClock.uptimeMillis()
+            if (now - hotCursorInjectAt >= 16L) {
+                hotCursorInjectAt = now
+                injectHoverAtCursor()
+            }
+            return
+        }
+        if (action != EvdevTouch.DOWN) return
+        val loc = IntArray(2)
+        var hitKey = false
+        keys.forEach { k ->
+            if ((k.type != KeyType.KEY && !k.type.isMouse) || !isKeyVisible(k)) return@forEach
+            if (hotPointers.containsKey(k.id)) return@forEach
+            val v = keyViews[k.id] ?: return@forEach
+            v.getLocationOnScreen(loc)
+            if (x >= loc[0] && x <= loc[0] + v.width && y >= loc[1] && y <= loc[1] + v.height) {
+                hotPointers[k.id] = id
+                hitKey = true
+                if (k.type.isMouse) {
+                    // 鼠标按键在热区里只做一次触发，按下后自动释放
+                    val t = k.type
+                    pressCounts[k.id] = (pressCounts[k.id] ?: 0) + 1
+                    setKeyLook(k, true)
+                    worker.execute { injectMouse { doMouseKey(t) } }
+                    ui.postDelayed({ releaseKey(k) }, 90)
+                } else {
+                    pressKey(k, x, y)
+                }
+            }
+        }
+        // 没按到按键的手指都用来拖光标；轻点则当作左键
+        if (!hitKey && mouseDrag) {
+            hotCursorLast[id] = PointF(x, y)
+            hotCursorTravel[id] = 0f
+            hotCursorMoved.remove(id)
+        }
+    }
+
+    private fun releaseHotKeys() {
+        val ids = hotPointers.keys.toList()
+        hotPointers.clear()
+        ids.forEach { kid -> keys.firstOrNull { it.id == kid }?.let { k -> releaseKey(k) } }
     }
 
     private inner class KeyTouch(
@@ -1903,10 +2117,12 @@ class KeypadOverlay(private val context: Context) {
 
     private fun toggleEdit() {
         editMode = !editMode
-        btnEdit?.text = getString(if (editMode) R.string.toolbar_done else R.string.toolbar_edit)
+        if (editMode) releaseHotKeys()
+        refreshBarLabels()
         anchorWarned = false
         applyKeyTouchability()
         syncAnchorMarkers()
+        refreshEvdev()
         if (!editMode) {
             KeyStore.saveKeys(context, keys)
             toast(getString(R.string.toast_layout_saved))
@@ -1974,8 +2190,8 @@ class KeypadOverlay(private val context: Context) {
         val etCode = view.findViewById<EditText>(R.id.etCode)
         val etSize = view.findViewById<EditText>(R.id.etSize)
         val spinnerShape = view.findViewById<Spinner>(R.id.spinnerShape)
-        val cbOneKey = view.findViewById<CheckBox>(R.id.cbOneKey)
-        val cbLatch = view.findViewById<CheckBox>(R.id.cbLatch)
+        val cbOneKey = view.findViewById<Switch>(R.id.cbOneKey)
+        val cbLatch = view.findViewById<Switch>(R.id.cbLatch)
         val llJoystick = view.findViewById<LinearLayout>(R.id.llJoystick)
         val spinnerStickMode = view.findViewById<Spinner>(R.id.spinnerStickMode)
         val etStickUp = view.findViewById<EditText>(R.id.etStickUp)
@@ -2092,9 +2308,11 @@ class KeypadOverlay(private val context: Context) {
 
         if (existing?.type == KeyType.TOUCH) rgType.check(R.id.rbTouch) else rgType.check(R.id.rbKey)
 
+        view.findViewById<TextView>(R.id.tvDialogTitle).text =
+            getString(if (existing == null) R.string.dialog_add_key else R.string.dialog_edit_key)
+
         showDialog(
             AlertDialog.Builder(themeCtx)
-                .setTitle(if (existing == null) R.string.dialog_add_key else R.string.dialog_edit_key)
                 .setView(view)
                 .setPositiveButton(if (existing == null) R.string.action_add else R.string.action_save) { _, _ ->
                     val position = spinner.selectedItemPosition.coerceIn(0, KeyCatalog.all.lastIndex)
@@ -2160,6 +2378,8 @@ class KeypadOverlay(private val context: Context) {
                         bringToolbarToFront()
                         if (!editMode) toggleEdit()
                         syncAnchorMarkers()
+                        applyKeyTouchability()
+                        refreshEvdev()
                     } else {
                         val oldIsStick = keyViews[existing.id] is JoystickPad
                         val oldSize = existing.sizeDp
@@ -2209,6 +2429,8 @@ class KeypadOverlay(private val context: Context) {
                         }
                         KeyStore.saveKeys(context, keys)
                         syncAnchorMarkers()
+                        applyKeyTouchability()
+                        refreshEvdev()
                     }
                 }
                 .setNegativeButton(R.string.action_cancel, null)
@@ -2798,17 +3020,22 @@ class KeypadOverlay(private val context: Context) {
     private fun toggleMousePad() {
         if (mouseOn) {
             mouseOn = false
-            btnMouse?.text = getString(R.string.toolbar_mouse)
+            refreshBarLabels()
+            hotCursorLast.clear()
+            hotCursorTravel.clear()
+            hotCursorMoved.clear()
+            refreshEvdev()
             removeDragLayer()
             removeCursor()
             toast(getString(R.string.toast_mouse_off))
             return
         }
         mouseOn = true
-        btnMouse?.text = getString(R.string.toolbar_mouse_on)
+        refreshBarLabels()
         fullScreenDrag = KeyStore.loadFullScreenMouse(context)
         buildCursor()
         if (fullScreenDrag) buildFullScreenLayer() else buildDragLayer()
+        refreshEvdev()
         raiseOverlayAboveLayer()
         toast(
             getString(
@@ -2829,6 +3056,18 @@ class KeypadOverlay(private val context: Context) {
             raiseOverlayAboveLayer()
             toast(getString(if (fullScreenDrag) R.string.toast_switched_fullscreen else R.string.toast_switched_touchpad))
         }
+    }
+
+    /** 工具条长按鼠标键：在全屏滑动与小触控板之间切换，并记住选择 */
+    private fun toggleMouseProfile() {
+        fullScreenDrag = !fullScreenDrag
+        KeyStore.saveFullScreenMouse(context, fullScreenDrag)
+        if (mouseOn) {
+            removeDragLayer()
+            if (fullScreenDrag) buildFullScreenLayer() else buildDragLayer()
+            raiseOverlayAboveLayer()
+        }
+        toast(getString(if (fullScreenDrag) R.string.toast_switched_fullscreen else R.string.toast_switched_touchpad))
     }
 
     private fun buildCursor() {
@@ -3183,6 +3422,9 @@ class KeypadOverlay(private val context: Context) {
     @SuppressLint("ClickableViewAccessibility")
     private fun buildFullScreenLayer() {
         removeDragLayer()
+        // 热区模式下不再铺全屏触摸层：滑动改由旁听的原始坐标驱动，
+        // 否则这一层会把所有手指都吃掉，热区按键全都失效。
+        if (hotMode) return
         val layer = View(themeCtx).apply {
             setBackgroundColor(0x01101010)
             isClickable = true

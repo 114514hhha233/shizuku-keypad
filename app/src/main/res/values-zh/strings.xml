@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 应用 / 服务 -->
-    <string name="app_name">哈基米虚拟键盘</string>
+    <string name="app_name">HJM Keypad</string>
     <string name="ime_service_name">按键空输入法</string>
 
     <!-- 主界面 -->
@@ -31,10 +31,44 @@
     <string name="block_ime">拦截系统输入法</string>
     <string name="block_ime_desc">开：显示虚拟按键期间用内置空输入法顶替，避免系统键盘弹出遮挡、字母被转成中文\n隐藏按键或退出应用时自动恢复原输入法\n需要 Shizuku 授权</string>
     <string name="section_help">使用说明</string>
-    <string name="help_text">① 启动 Shizuku 并授权，授予悬浮窗权限\n② 点「显示虚拟按键」，切到游戏即可使用\n\n悬浮条：\n· ≡ 拖动整条工具条，长按隐藏控制菜单（重新打开应用恢复）\n· 编辑：按键可自由拖动，点按键可改键位/文字/注入方式或删除\n· ＋：添加按键，内置字母、数字、F1-F12、方向键、小键盘、鼠标键，也可填自定义键值\n· 宏：点一下再点一个自定义按键，输入序列，如 Ctrl+Shift+K 或 W,Space,A\n· 存 / 读：把当前布局存成命名预设，或加载/删除预设\n· 一键：总开关。勾选「一键开关」的按键，关闭总开关时整体隐藏，再打开恢复\n· 整块：5 行紧凑键盘。Caps 点亮后 Shift 持续按住，再点关闭；「符」切到符号/F1-F12 页；拖动顶部 ≡ 移动，双指捏合调宽度\n· 鼠标：开关虚拟鼠标；触控板单指拖动移光标、轻点左键、双指点按右键、双指上下滑滚轮、长按切换左键按住\n· 鼠标按键：随时可用，位置跟随虚拟鼠标\n\n注入方式：\n· 键盘事件：云游戏 / 支持键盘的应用，可按住不放\n· 触摸点击：原生手游，按住按键时该位置保持触摸\n· 鼠标按键：发送鼠标按键事件，位置跟随虚拟鼠标\n\n配置预设：首页可保存/加载多套按键，导出到剪贴板或从剪贴板导入</string>
+    <string name="help_text">① 启动 Shizuku 并授权，授予悬浮窗权限\n② 打开「显示悬浮按键」，切到游戏即可使用\n\n悬浮条：\n· ≡ 拖动整条工具条，长按隐藏控制菜单（重新打开应用恢复）\n· 编辑：按键可自由拖动，点按键可改键位/文字/注入方式或删除\n· ＋：添加按键，内置字母、数字、F1-F12、方向键、小键盘、鼠标键，也可填自定义键值\n· 宏：点一下再点一个自定义按键，输入序列，如 Ctrl+Shift+K 或 W,Space,A\n· 存 / 读：把当前布局存成命名预设，或加载/删除预设\n· 一键：总开关。勾选「一键开关」的按键，关闭总开关时整体隐藏，再打开恢复\n· 整块：5 行紧凑键盘。Caps 点亮后 Shift 持续按住，再点关闭；「符」切到符号/F1-F12 页；拖动顶部 ≡ 移动，双指捏合调宽度\n· 鼠标：开关虚拟鼠标；触控板单指拖动移光标、轻点左键、双指点按右键、双指上下滑滚轮、长按切换左键按住\n· 鼠标按键：随时可用，位置跟随虚拟鼠标\n\n注入方式：\n· 键盘事件：云游戏 / 支持键盘的应用，可按住不放\n· 触摸点击：原生手游，按住按键时该位置保持触摸\n· 鼠标按键：发送鼠标按键事件，位置跟随虚拟鼠标\n\n配置预设：首页可保存/加载多套按键，导出到剪贴板或从剪贴板导入</string>
     <string name="help_note">按键固定为深色底 + 白色边框，按下不变色</string>
     <string name="about_link">关于软件与作者  ›</string>
     <string name="about_link_with_version">%1$s · 关于软件与作者  ›</string>
+
+    <!-- 主界面（Material 3） -->
+    <string name="section_status">运行状态</string>
+    <string name="section_control">控制</string>
+    <string name="label_shizuku_service">Shizuku 服务</string>
+    <string name="label_overlay_permission">悬浮窗权限</string>
+    <string name="state_checking">检测中…</string>
+    <string name="state_authorized">已授权</string>
+    <string name="state_not_authorized">未授权</string>
+    <string name="state_not_running">未运行</string>
+    <string name="state_granted">已开启</string>
+    <string name="state_not_granted">未开启</string>
+    <string name="switch_show_overlay">显示悬浮按键</string>
+    <string name="btn_open_overlay_settings">打开悬浮窗设置</string>
+
+    <!-- 帮助页 -->
+    <string name="help_entry_title">帮助与常见问题</string>
+    <string name="help_entry_desc">按键没反应、原生触摸拖不动、输入法遮挡等解决方案</string>
+    <string name="help_title">帮助与常见问题</string>
+    <string name="help_intro">下面按症状列出常见问题和解决方式。</string>
+    <string name="help_q1_title">按键按下没反应</string>
+    <string name="help_q1_body">· 游戏里按键无效时，进入工具栏「✎ 编辑」，点该按键把注入方式改成「触摸点击」；云游戏保持「键盘事件」。\n· 确认主界面状态卡的两个圆点都是绿色。\n· 多点触控模式下要按到按键的实际位置，滑动的同时也能按。</string>
+    <string name="help_q2_title">滑视角时按不到新按键</string>
+    <string name="help_q2_body">这不是权限问题，是安卓的触摸归属：第一根手指落在游戏窗口后，其它手指都归游戏，悬浮窗按键收不到。\n打开工具栏「◈ 多点触控」即可解决：按键不再抢触摸，改为旁听触摸坐标触发，滑动的同时也能按新键。\n多点触控下鼠标左/右/中键、滚轮都能用，轻点空白处等于鼠标左键；摇杆暂不支持多点触控。</string>
+    <string name="help_q3_title">开了全屏鼠标后，原生触摸滑不动</string>
+    <string name="help_q3_body">悬浮窗模式的全屏鼠标必须铺一层全屏触摸层来接管拖动，原生触摸因此被挡住，这是系统层面的必然占用。\n多点触控模式已经撤掉这一层，原生触摸可以到达游戏；但如果游戏检测到鼠标移动后切到「鼠标视角」，相机就不再跟随触摸，这是游戏自己的输入模式切换，不是按键层抢触摸。\n需要原生触摸时，点工具栏「↖ 鼠标」关闭虚拟鼠标即可。</string>
+    <string name="help_q4_title">输入法弹出遮挡 / 字母变中文</string>
+    <string name="help_q4_body">主界面打开「拦截系统输入法」：显示按键期间用内置空白输入法顶替，隐藏按键或退出应用后自动恢复原输入法。\n该功能需要 Shizuku 授权。</string>
+    <string name="help_q5_title">Shizuku 或悬浮窗权限未就绪</string>
+    <string name="help_q5_body">状态卡两个圆点都变绿才可用。\n· Shizuku 需要 11 以上版本，手机重启后要重新启动 Shizuku。\n· 未授权时点「授权 Shizuku」；未授予悬浮窗时点「授予悬浮窗权限」。</string>
+    <string name="help_q6_title">修改按键位置、大小和键值</string>
+    <string name="help_q6_body">工具栏点「✎ 编辑」后可直接拖动按键；点按键可改键位、显示文字、大小、形状、注入方式，或删除。\n「＋」添加按键，内置字母、数字、F1-F12、方向键、小键盘和鼠标键；「⚡ 宏」可以把一串按键绑到一个键上。</string>
+    <string name="help_q7_title">预设、备份与恢复</string>
+    <string name="help_q7_body">主界面「配置预设」可保存/读取多套布局；「导出到剪贴板」生成的 JSON 可以备份或分享，「从剪贴板导入」会覆盖当前布局。\n「恢复默认布局」会清除自定义按键。</string>
 
     <!-- 状态 -->
     <string name="shizuku_not_running">Shizuku：未运行</string>
@@ -104,6 +138,10 @@
     <string name="toolbar_one_key_off">一键关</string>
     <string name="toolbar_all_off">全关</string>
     <string name="toolbar_all_on">全开</string>
+    <string name="toolbar_hot_off">悬浮窗</string>
+    <string name="toolbar_hot_on">多点触控</string>
+    <string name="toast_hot_on">已开启多点触控：按键不再挡触摸，滑动和按键互不干扰</string>
+    <string name="toast_hot_off">已切到悬浮窗：每个按键独占自己的触摸</string>
     <string name="toolbar_mouse">鼠标</string>
     <string name="toolbar_mouse_on">鼠标开</string>
     <string name="panel_handle">≡  整块键盘</string>
@@ -207,6 +245,9 @@
 
     <!-- 按键对话框 -->
     <string name="dialog_key_section_key">键位</string>
+    <string name="dialog_key_subtitle">调整键位、外观与注入方式</string>
+    <string name="dialog_key_group_look">显示</string>
+    <string name="dialog_key_group_behavior">行为</string>
     <string name="dialog_key_label_section">按键上显示的文字</string>
     <string name="dialog_key_label_hint">例如 W、跳、攻击</string>
     <string name="dialog_key_size_section">按键大小（dp，40 ~ 120）</string>
@@ -233,7 +274,7 @@
 
     <!-- 通知 -->
     <string name="notification_channel_name">虚拟按键</string>
-    <string name="notification_running_title">哈基米虚拟键盘运行中</string>
+    <string name="notification_running_title">HJM Keypad 运行中</string>
     <string name="notification_running_text">悬浮按键已显示，点击回到应用</string>
 
     <!-- 注入错误 -->

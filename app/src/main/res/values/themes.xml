@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- M3 动态取色主题：Android 12+ 跟随壁纸取色，低版本回落到 M3 基准配色 -->
+    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:colorAccent">?attr/colorPrimary</item>
+    </style>
+
+</resources>

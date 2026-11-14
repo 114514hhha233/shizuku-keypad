@@ -2,12 +2,13 @@ package com.example.shizukukeypad
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,11 +19,13 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.SeekBar
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
 import rikka.shizuku.Shizuku
+import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
 
@@ -31,7 +34,12 @@ class MainActivity : Activity() {
     private lateinit var tvKeys: TextView
     private lateinit var btnAuth: Button
     private lateinit var btnOverlayPerm: Button
-    private lateinit var btnToggle: Button
+    private lateinit var swOverlay: MaterialSwitch
+    private lateinit var dotShizuku: View
+    private lateinit var dotOverlay: View
+
+    /** 程序刷新开关状态时，避免回调再次触发显示/隐藏 */
+    private var syncingOverlaySwitch = false
 
     private val ui = Handler(Looper.getMainLooper())
 
@@ -58,7 +66,9 @@ class MainActivity : Activity() {
         tvKeys = findViewById(R.id.tvKeys)
         btnAuth = findViewById(R.id.btnAuth)
         btnOverlayPerm = findViewById(R.id.btnOverlayPerm)
-        btnToggle = findViewById(R.id.btnToggle)
+        swOverlay = findViewById(R.id.swOverlay)
+        dotShizuku = findViewById(R.id.dotShizuku)
+        dotOverlay = findViewById(R.id.dotOverlay)
 
         Shizuku.addBinderReceivedListenerSticky(binderReceived)
         Shizuku.addBinderDeadListener(binderDead)
@@ -66,10 +76,22 @@ class MainActivity : Activity() {
 
         btnAuth.setOnClickListener { requestShizuku() }
         btnOverlayPerm.setOnClickListener { requestOverlayPermission() }
-        btnToggle.setOnClickListener { toggleOverlay() }
+        findViewById<Button>(R.id.btnOverlaySettings).setOnClickListener { requestOverlayPermission() }
         findViewById<Button>(R.id.btnReset).setOnClickListener { resetLayout() }
+        findViewById<View>(R.id.btnAbout).setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+        findViewById<View>(R.id.btnHelp).setOnClickListener {
+            startActivity(Intent(this, HelpActivity::class.java))
+        }
         findViewById<TextView>(R.id.aboutLink).setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
+        }
+        swOverlay.setOnCheckedChangeListener { _, checked ->
+            if (syncingOverlaySwitch) return@setOnCheckedChangeListener
+            if (checked == OverlayService.overlayShowing) return@setOnCheckedChangeListener
+            toggleOverlay()
+            ui.postDelayed({ refresh() }, 400)
         }
         runCatching { packageManager.getPackageInfo(packageName, 0).versionName }
             .getOrNull()
@@ -119,34 +141,40 @@ class MainActivity : Activity() {
     }.getOrDefault(false)
 
     private fun refresh() {
+        val running = shizukuRunning()
         val granted = shizukuGranted()
-        tvStatus.text = when {
-            !shizukuRunning() -> getString(R.string.shizuku_not_running)
-            !granted -> getString(R.string.shizuku_running_unauthorized)
-            else -> getString(R.string.shizuku_authorized_status)
-        }
+        tvStatus.text = getString(
+            when {
+                !running -> R.string.state_not_running
+                !granted -> R.string.state_not_authorized
+                else -> R.string.state_authorized
+            }
+        )
+        setDot(dotShizuku, granted)
 
         val overlayAllowed = Settings.canDrawOverlays(this)
-        val showing = OverlayService.overlayShowing
         tvDetail.text = getString(
-            R.string.status_detail,
-            getString(if (granted) R.string.status_ready else R.string.status_not_ready),
-            getString(
-                if (overlayAllowed) R.string.status_overlay_granted
-                else R.string.status_overlay_not_granted
-            ),
-            getString(if (showing) R.string.status_keys_showing else R.string.status_keys_not_showing)
+            if (overlayAllowed) R.string.state_granted else R.string.state_not_granted
         )
+        setDot(dotOverlay, overlayAllowed)
 
-        btnAuth.visibility = if (shizukuRunning() && !granted) View.VISIBLE else View.GONE
+        btnAuth.visibility = if (running && !granted) View.VISIBLE else View.GONE
         btnOverlayPerm.visibility = if (!overlayAllowed) View.VISIBLE else View.GONE
-        btnToggle.text = getString(
-            if (showing) R.string.btn_hide_virtual_keys else R.string.btn_show_virtual_keys
-        )
+
+        val showing = OverlayService.overlayShowing
+        syncingOverlaySwitch = true
+        swOverlay.isChecked = showing
+        syncingOverlaySwitch = false
 
         val saved = KeyStore.loadKeys(this).size
         tvKeys.text = if (saved == 0) getString(R.string.keys_count_default)
         else getString(R.string.keys_count_saved, saved)
+    }
+
+    private fun setDot(dot: View, ok: Boolean) {
+        dot.backgroundTintList = ColorStateList.valueOf(
+            Color.parseColor(if (ok) "#2FA36B" else "#E05C5C")
+        )
     }
 
     // ==================== 权限 ====================
@@ -209,49 +237,37 @@ class MainActivity : Activity() {
     }
 
     private fun setupAlphaSlider() {
-        val seek = findViewById<SeekBar>(R.id.seekAlpha)
+        val slider = findViewById<Slider>(R.id.seekAlpha)
         val label = findViewById<TextView>(R.id.tvAlpha)
-        val saved = KeyStore.loadAlpha(this)
-        seek.progress = saved - 30
+        val saved = KeyStore.loadAlpha(this).coerceIn(30, 100)
+        slider.value = saved.toFloat()
         label.text = getString(R.string.alpha_label, saved)
-        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser) return
-                val value = progress + 30
-                label.text = getString(R.string.alpha_label, value)
-                KeyStore.saveAlpha(this@MainActivity, value)
-                OverlayService.current?.setKeyAlpha(value)
-            }
-
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
+        slider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            val v = value.roundToInt()
+            label.text = getString(R.string.alpha_label, v)
+            KeyStore.saveAlpha(this@MainActivity, v)
+            OverlayService.current?.setKeyAlpha(v)
+        }
     }
 
     private fun setupMouseGainSlider() {
-        val seek = findViewById<SeekBar>(R.id.seekMouseGain)
+        val slider = findViewById<Slider>(R.id.seekMouseGain)
         val label = findViewById<TextView>(R.id.tvMouseGain)
-        val saved = KeyStore.loadMouseGain(this)
-        seek.progress = saved - 50
+        val saved = KeyStore.loadMouseGain(this).coerceIn(50, 250)
+        slider.value = saved.toFloat()
         label.text = getString(R.string.mouse_gain_label, saved)
-        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser) return
-                val value = progress + 50
-                label.text = getString(R.string.mouse_gain_label, value)
-                KeyStore.saveMouseGain(this@MainActivity, value)
-                OverlayService.current?.setMouseGain(value)
-            }
-
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
+        slider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            val v = value.roundToInt()
+            label.text = getString(R.string.mouse_gain_label, v)
+            KeyStore.saveMouseGain(this@MainActivity, v)
+            OverlayService.current?.setMouseGain(v)
+        }
     }
 
     private fun setupFullScreenSwitch() {
-        val sw = findViewById<Switch>(R.id.swFullScreenMouse)
+        val sw = findViewById<MaterialSwitch>(R.id.swFullScreenMouse)
         sw.isChecked = KeyStore.loadFullScreenMouse(this)
         sw.setOnCheckedChangeListener { _, checked ->
             KeyStore.saveFullScreenMouse(this, checked)
@@ -260,7 +276,7 @@ class MainActivity : Activity() {
     }
 
     private fun setupBlockImeSwitch() {
-        val sw = findViewById<Switch>(R.id.swBlockIme)
+        val sw = findViewById<MaterialSwitch>(R.id.swBlockIme)
         sw.isChecked = KeyStore.loadBlockIme(this)
         sw.setOnCheckedChangeListener { _, checked ->
             KeyStore.saveBlockIme(this, checked)
@@ -302,7 +318,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(et)
         }
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_save_current_keys)
             .setView(box)
             .setPositiveButton(R.string.action_save) { _, _ ->
@@ -324,7 +340,7 @@ class MainActivity : Activity() {
             toast(getString(R.string.toast_no_presets))
             return
         }
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_load_preset)
             .setItems(names.toTypedArray()) { _, which -> applyPreset(names[which]) }
             .setNeutralButton(R.string.dialog_delete_preset) { _, _ -> deletePresetDialog(names) }
@@ -333,7 +349,7 @@ class MainActivity : Activity() {
     }
 
     private fun deletePresetDialog(names: List<String>) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_delete_preset)
             .setItems(names.toTypedArray()) { _, which ->
                 KeyStore.deletePreset(this, names[which])
@@ -378,7 +394,7 @@ class MainActivity : Activity() {
             toast(getString(R.string.toast_invalid_config))
             return
         }
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_import_config)
             .setMessage(R.string.dialog_import_message)
             .setPositiveButton(R.string.action_import) { _, _ ->

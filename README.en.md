@@ -1,33 +1,81 @@
 <div align="center">
 
-<img src="assets/icon.png" width="128" alt="Hajimi Virtual Keypad icon">
+<img src="assets/icon.png" width="128" alt="HJM Keypad icon">
 
-# Hajimi Virtual Keypad
+# HJM Keypad
 
 [简体中文](README.md) · **English**
 
-**A draggable virtual keyboard, joystick and mouse overlay for Android games — no root, no game modification.**
+**A draggable virtual keyboard and mouse overlay for Android games — coordinate-based multi-touch hot zones let you drag the camera and press new keys at the same time. No root, no game modification.**
 
 [![Release](https://img.shields.io/github/v/release/114514hhha233/shizuku-keypad?label=release)](https://github.com/114514hhha233/shizuku-keypad/releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.6.1/shizuku-keypad-1.6.1.apk)** ·
+**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.7/HJM-Keypad-1.7.apk)** ·
 [Source](https://github.com/114514hhha233/shizuku-keypad) ·
 [Issues](https://github.com/114514hhha233/shizuku-keypad/issues)
 
 </div>
 
-Add a freely placeable virtual keyboard and mouse to Android games: every key is its own floating window, and **Shizuku** injects key events into the system input layer, so cloud gaming, game streaming, emulators and native mobile games all work — no root and no game modification required.
+HJM Keypad (formerly "Hajimi Virtual Keypad") adds a freely placeable virtual keyboard and mouse to Android games: each key is its own floating window, and **Shizuku** injects key / touch / mouse events into the system input layer, so cloud gaming, game streaming, emulators and native mobile games all work — no root and no game modification required.
 
+- App name: HJM Keypad (package name unchanged; upgrades over previous installs)
 - Package: `com.example.shizukukeypad`
-- Version: 1.6 (versionCode 8)
-- Min Android: 8.0 (API 26), target API 34
-- Dependency: Shizuku 13.x (`dev.rikka.shizuku:api/aidl/provider:13.1.5`)
+- Version: 1.7 (versionCode 10)
+- Min Android: 8.0 (API 26), targetSdk / compileSdk 34
+- Dependencies: Shizuku 13.x (`dev.rikka.shizuku:api/aidl/provider:13.1.5`), Material Components 1.12
 - Language: follows the system; Simplified Chinese and English included
 
 > Experimental project — not yet validated on a wide range of devices and games. Feedback is welcome.
+
+---
+
+## Multi-touch (core, on by default)
+
+This is the most important part of the project: **coordinate-based hot zones make "drag the camera and press a new key at the same time" actually work.**
+
+### The problem it solves
+
+Android touch streams have ownership: once the first finger lands on the game window, the whole gesture belongs to the game and every later finger goes to the game — the overlay never receives them. An injected "fake finger" belongs to a separate input stream and cannot take a slot on the touchscreen (verified on Android 15), so stealing touches through injection is a dead end.
+
+### How it works
+
+In multi-touch mode every key window is set to `FLAG_NOT_TOUCHABLE`, so keys no longer take touches. Triggering happens on the listening side:
+
+1. Through **Shizuku** (shell identity) the app runs `getevent -lp` to list touchscreen devices and read the `min/max` range of `ABS_MT_POSITION_X/Y`, then `getevent -lt` to stream raw events from `/dev/input/event*`. It is **read-only and non-consuming** — the system still delivers every event to the game; we just see each finger's coordinates as well.
+2. Raw multi-finger data is parsed: `ABS_MT_SLOT` (finger slot), `ABS_MT_TRACKING_ID` (finger identity), `ABS_MT_POSITION_X/Y` (raw coordinates), settled once per `SYN_REPORT` frame.
+3. **Coordinate math**: normalize the absolute value `(raw - min) / (max - min)`, then map it to the current screen orientation using `Surface.rotation`, producing screen pixels:
+
+   ```
+   ROTATION_0   : (nx * W, ny * H)
+   ROTATION_90  : (ny * W, (1 - nx) * H)
+   ROTATION_180 : ((1 - nx) * W, (1 - ny) * H)
+   ROTATION_270 : ((1 - ny) * W, nx * H)
+   ```
+
+4. **Hot-zone hit test**: when a finger goes down, its screen coordinate is tested against each key's real screen rectangle (window position + size). A hit injects that key; lifting releases it by finger identity. Fingers that land on empty space drive the full-screen mouse cursor.
+
+### What you get
+
+- **Press new keys while dragging the camera**: the first finger can be on the game, later fingers still trigger keys;
+- several fingers can hold different keys at once without interference;
+- keys no longer block touches — the game keeps its native touch input;
+- mouse left/right/middle buttons and the wheel work in multi-touch mode; the full-screen mouse supports multi-finger cursor dragging, and tapping empty space acts as a left click.
+
+### Multi-touch vs window mode
+
+| | Multi-touch (default) | Window mode |
+| --- | --- | --- |
+| Key windows | all non-touchable | separate windows + `FLAG_SPLIT_TOUCH` |
+| First finger | can land anywhere | must land on a key window |
+| Press keys while dragging camera | ✅ yes | ❌ later fingers are lost |
+| Native touch | fully preserved | blocked by full-screen mouse |
+| Joystick / trackpad gestures | ❌ not supported | ✅ supported |
+| Requires | Shizuku + `getevent` listening | Shizuku injection |
+
+The toolbar "◈ Multi-touch" button is on by default; tap it to switch to "Windows" mode (for devices that cannot listen to raw touch).
 
 ---
 
@@ -36,101 +84,85 @@ Add a freely placeable virtual keyboard and mouse to Android games: every key is
 ### Keys
 - Each key is its own `TYPE_APPLICATION_OVERLAY` window, freely draggable, resizable (40–120dp, with one-tap presets 40/50/60/70/80/90/100/120), round or rounded-square.
 - Two injection modes:
-  - **Keyboard keys**: inject `KeyEvent` (keyDown / keyUp) via Shizuku — works with cloud gaming, streaming and remote desktop.
-  - **Touch keys**: the window is set to `FLAG_NOT_TOUCHABLE`, so fingers pass straight through to the game and the system provides **native multi-touch** with zero injection latency; pressing several touch keys at once is true multi-finger input.
-- **Lock key**: tap once to hold, tap again to release — great for continuous movement or sprinting.
+  - **Keyboard events**: inject `KeyEvent` (down/up) via Shizuku — cloud gaming, streaming and remote desktop, can be held down.
+  - **Touch tap**: inject a finger at the key position — native mobile games, stays touched while held.
+- **Lock key**: tap once to hold, tap again to release.
 - **Macros**: steps separated by comma or space, `+` means pressed together, e.g. `Ctrl+Shift+K, A`.
-- Custom keyCode: any Android `KeyEvent` keyCode (1–400) can be entered directly.
+- Custom keyCode: any Android `KeyEvent` keyCode (1–400).
 - Toggle: when the toolbar master switch is off, checked keys are hidden entirely.
+- All off / all on: hide every key on screen at once, tap again to restore.
 
 ### Virtual joystick
-- **Key-value mode**: 8-direction output with a 22% center dead zone; on a direction change only release/press deltas are emitted. Default **W / S / A / D** (51 / 47 / 29 / 32); each direction can be remapped.
-- **Touch mode**: injects one finger at an output point to push the game's own joystick; displacement is clamped to the stick travel. The output point can be dragged with a yellow crosshair in edit mode.
-- The stick head follows your finger and can be repositioned in edit mode.
-
-### Thumb rest
-A small translucent area that **sends no keys** — it only holds the gesture.
-
-Android has a hard rule for multi-touch: once a finger goes down, the gesture belongs to the window it landed on; if the first finger lands on the game, all subsequent fingers go to the game and the overlay never receives them. Conversely, if the first finger lands on our window, later fingers keep coming to us and we can route them by screen coordinates.
-
-So: **keep your thumb on the thumb rest (or joystick, or any key) and your other hand can freely look around and press new keys**. This is the only stable "full-screen multi-touch" approach.
-
-### Full keyboard
-- One QWERTY keyboard window; all keys are routed by pointerId, so simultaneous presses don't steal each other's keys.
-- Drag the three-bar handle to move it; pinch to zoom and remember width.
-- Letter/symbol layers, Caps and Shift handling.
-- Mutually exclusive with individual keys to avoid overlap.
+- **Key-value mode**: 8-direction output with a 22% center dead zone, default W/S/A/D (51/47/29/32), each direction remappable.
+- **Touch mode**: injects a finger at an output point to push the game's own joystick; the output point can be dragged with a crosshair in edit mode.
+- The joystick is not supported in multi-touch mode yet; use window mode.
 
 ### Mouse
-- Trackpad-style dragging: slide to move the cursor, tap the pad for left click.
-- Separate cursor window; mouse buttons (left/middle/right, wheel up/down) are injected at the cursor position.
-- Sensitivity 50%–250%; drag-lock (left button held) can optionally drag across the whole screen.
+- **Full-screen mouse** (default): slide anywhere to move the cursor; tap for left click, two-finger tap for right click, two-finger swipe for the wheel.
+- **Trackpad**: a small panel to drag the cursor (long-press the toolbar "↖ Mouse" to toggle).
+- The cursor is its own window; mouse buttons are injected at the cursor position; sensitivity 50%–250%.
+
+### Full keyboard
+- One QWERTY keyboard window; keys are routed by pointerId, so simultaneous presses don't steal each other's keys.
+- Drag the top handle, pinch to zoom, letter/symbol layers, Caps / Shift.
 
 ### Editing & configuration
-- Toolbar: edit mode, mouse, full keyboard, toggle, all-off/all-on (hide every key at once), macro binding, opacity.
+- Toolbar: edit, add, macro, all-off, close, save / load, full keyboard, one-key, mouse, multi-touch.
 - In edit mode, drag keys, tap to edit, long-press to delete.
-- Layout, opacity, sensitivity and toggle states persist via `SharedPreferences + JSON`; key positions are stored as 0–1 ratios, so rotation and resolution changes never misplace them.
-- Preset management and config import/export.
-- Optional "block system IME": temporarily swap in a blank IME so the system keyboard doesn't cover the screen.
-- Foreground service keeps the overlay alive after switching to a game.
-- UI text follows the system language; Simplified Chinese and English included.
+- The key dialog uses grouped cards: key, display, behavior, joystick and injection method are separated; size has common presets.
+- Layout / opacity / sensitivity / toggles persist via `SharedPreferences + JSON`; positions are stored as 0–1 ratios, so rotation and resolution changes never misplace them.
+- Preset management and config import/export (clipboard JSON).
+- Optional "block system IME": while keys are shown, a blank IME replaces the system keyboard to avoid occlusion or letter-to-CJK conversion.
+- Main screen uses Material 3 with Android 12+ dynamic color; includes a dedicated help / FAQ page.
 
 ---
 
 ## How it works
 
 ### 1. Why Shizuku
-A normal app has only three ways to inject keys: accessibility (high latency, detectable by games), IME (text only, no modifier combos), or root. Shizuku starts a privileged process via `adb shell` or root and hands the app the `IInputManager` binder, so it can call directly:
+A normal app has only three ways to inject keys: accessibility (high latency, detectable by games), IME (text only), or root. Shizuku starts a privileged process via `adb shell` or root and hands the app the `IInputManager` binder, so it can call directly:
 
 ```
 IInputManager.injectInputEvent(event, MODE_WAIT_FOR_FINISH)
 ```
 
-The injected events are system-level input, indistinguishable from real ones, and require no special permission.
+The injected events are system-level input, indistinguishable from real ones.
 
 ### 2. Why each key is a separate window
-If all keys were drawn in one large window, that window would cover the whole screen, swallow injected taps, and the system would attribute all touch in that region to it. Separate small windows solve this:
+If all keys were drawn in one large window, that window would cover the whole screen, swallow injected taps, and the system would attribute all touch in that region to it. Separate small windows only hit-test the key area, use the window's real screen coordinates for injection, and `FLAG_SPLIT_TOUCH` lets multiple fingers land on different keys.
 
-- only the key's small area participates in touch hit-testing, so the game view is never occluded;
-- each key's injection coordinates are its window's real screen coordinates — no manual rotation/offset math;
-- the window uses `FLAG_SPLIT_TOUCH`, so multiple fingers can land on different key windows.
+### 3. Why multi-touch listens to evdev
+See the "Multi-touch" section above: touch streams have ownership, an injected fake finger can't occupy a slot, so the app listens to raw touchscreen events instead — read-only, the game still gets native touch, and those coordinates drive the key hot zones. The transform is `(raw - min) / (max - min)` followed by the screen-orientation rotation.
 
-### 3. Move out of the way before injecting
-Injected touches go through the same dispatch path as real fingers and hit the topmost touchable window at those coordinates. If our own overlay is in the way, the injection bounces back to us (symptom: the key flashes and the game does nothing). So before injecting, blocking windows are temporarily set to `FLAG_NOT_TOUCHABLE` and restored afterwards.
+### 4. Window mode vs full-screen mouse
+A full-screen mouse must place a full-screen touch layer to receive drags, and that layer blocks native touch — an unavoidable consequence of window dispatch. Multi-touch mode removes that layer, so native touch reaches the game; but if a game switches to "mouse look" after receiving injected mouse movement, the camera stops following touch. That is the game's own input-mode switch, not the overlay stealing touches.
 
-Touch keys are the opposite: they are never touchable, so fingers pass straight through and use native multi-touch with zero injection latency.
+### 5. Move out of the way before injecting
+Injected events hit the topmost touchable window. If our overlay is in the way, the injection bounces back to us, so blocking windows are temporarily set to `FLAG_NOT_TOUCHABLE` and restored afterwards.
 
-### 4. Multi-finger routing
-`FLAG_SPLIT_TOUCH` only guarantees that the window the first finger landed on keeps receiving subsequent fingers. So each key window does a second-level dispatch:
-
-- down: record pointer → key;
-- later fingers outside a key: decide by screen coordinates, or forward the whole pointer to the game (`forwardDown / forwardMove / forwardUp`);
-- up: release the key or forward the pointer up.
-
-This is why you can press keys while tapping and dragging elsewhere, and how the thumb rest works.
-
-### 5. Coordinates and persistence
+### 6. Coordinates and persistence
 Screen size comes from `currentWindowMetrics` (real pixels for the current rotation); key positions are stored as ratios, so rotation and device changes follow automatically.
 
 ---
 
 ## Known limitations
 
-- **Can't press keys while swiping the camera**: as described above, once the first finger lands on the game, the gesture belongs to the game. Keep one finger on the thumb rest / joystick / a key.
-- **No full-screen capture layer**: a full-screen window blocks injected events (self-loop); making it non-touchable means it receives no fingers; toggling touchability mid-gesture is cancelled by the system. These three cannot hold at once — it's a window-dispatch rule, not an app-permission issue.
-- **Touch keys and joystick touch mode depend on injection**: injected fingers are a separate input stream; a few games/apps may ignore them or behave oddly near system gesture edges.
-- **No iOS / no-Shizuku mode**: without Shizuku you can only view the layout, not inject.
-- For cloud gaming/streaming, prefer keyboard-key mode; for native mobile games, prefer touch-key / joystick touch mode.
+- Multi-touch mode depends on Shizuku and `getevent`; some devices use different touch device nodes or coordinate systems and may not work.
+- Multi-touch does not capture native touch, so key presses are also delivered to the game underneath.
+- Full-screen mouse + window mode blocks native touch; use multi-touch or turn the virtual mouse off if you need native touch.
+- The joystick and trackpad gestures (two-finger tap, etc.) are not supported in multi-touch mode.
+- Injected touches are a separate input stream; a few games may ignore them.
+- No iOS / no-Shizuku mode.
 
 ---
 
 ## Install & usage
 
-1. Download `shizuku-keypad-1.6.1.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
+1. Download `HJM-Keypad-1.7.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
 2. Install [Shizuku](https://shizuku.rikka.app/) and start its service via `adb shell` or root as described in its documentation.
 3. Open the app and grant "Display over other apps" and notification permissions.
-4. Tap "Authorize Shizuku" in the app; the status should become connected.
-5. Tap "Show virtual keys" to launch the overlay; go back to the home screen or a game and the toolbar and keys appear.
+4. Tap "Authorize Shizuku"; the status should become connected.
+5. Tap "Show virtual keys" to launch the overlay; go back to the home screen or a game — the toolbar and keys appear, with multi-touch already on.
 6. Tap "Edit" on the toolbar to enter edit mode, tap "+" to add keys and drag them into place; exit edit mode to use.
 
 ---
@@ -140,10 +172,13 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 Requires JDK 17 and Android SDK 34. The repo does not include a Gradle wrapper; use a local Gradle 8.x:
 
 ```bash
+export JAVA_HOME=/path/to/jdk17
 export ANDROID_HOME=/path/to/android-sdk
 gradle :app:assembleDebug
 # Output: app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The release APK is debug-signed and installs as an upgrade over previous builds (same package name).
 
 ---
 
@@ -151,15 +186,18 @@ gradle :app:assembleDebug
 
 | File | Responsibility |
 | --- | --- |
-| `KeypadOverlay.kt` | Overlay core: key windows, touch dispatch, injection, joystick, trackpad, edit mode, full keyboard, toolbar |
-| `KeyModel.kt` | Key data model, key catalog, macro parser, SharedPreferences/JSON persistence |
-| `JoystickPad.kt` | Joystick widget: dial + stick head drawing and edit dragging |
-| `ShizukuInjector.kt` | Shizuku binder and input injection: keys, touch, mouse, multi-touch pointer management |
+| `KeypadOverlay.kt` | Overlay core: key windows, touch dispatch, injection, joystick, trackpad, full keyboard, multi-touch hot zones, toolbar |
+| `EvdevTouch.kt` | Shizuku listener for raw touchscreen events; outputs screen coordinates |
+| `KeyModel.kt` | Key model, key catalog, macro parser, persistence |
+| `JoystickPad.kt` | Joystick widget |
+| `ShizukuInjector.kt` | Shizuku binder and key / touch / mouse injection |
 | `OverlayService.kt` | Foreground service hosting the overlay |
-| `MainActivity.kt` | Authorization, toggles, opacity/sensitivity, presets, import/export |
+| `MainActivity.kt` | Authorization, toggles, appearance, presets, import/export |
+| `HelpActivity.kt` | Help and FAQ page |
 | `AboutActivity.kt` | About page |
 | `ImeGuard.kt` / `NoopImeService.kt` | Blank IME used to block the system keyboard |
-| `res/layout/dialog_key.xml` | Key config dialog (with joystick options) |
+| `res/layout/` | M3 main screen, help page, about page, key dialog |
+| `res/values/themes.xml` | `Theme.Material3.DynamicColors.DayNight.NoActionBar` |
 
 ---
 
@@ -168,12 +206,20 @@ gradle :app:assembleDebug
 | Permission | Purpose |
 | --- | --- |
 | `SYSTEM_ALERT_WINDOW` | Draw floating keys and toolbar |
-| `moe.shizuku.manager.permission.API_V23` | Call Shizuku to inject input events |
+| `moe.shizuku.manager.permission.API_V23` | Call Shizuku to inject input and listen to touch |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` | Keep the overlay alive |
 | `POST_NOTIFICATIONS` | Foreground service notification (Android 13+) |
 | `BIND_INPUT_METHOD` (service declaration) | Blank IME, only when "block system IME" is enabled |
 
-The app has no network access and collects no data; configuration stays on the device.
+The app requests no network permission and collects no data; configuration stays on the device.
+
+---
+
+## Changelog
+
+- 1.7: renamed to **HJM Keypad**, new cat-keyboard adaptive icon, multi-touch mode on by default (evdev listening + coordinate hot zones), Material 3 main screen with dynamic color, dedicated help / FAQ page, redesigned key dialog, full-screen mouse multi-finger drag and tap-to-left-click.
+- 1.6: full keyboard, hot-zone experiment, i18n, key size presets.
+- 1.5: preset keys, common-size picker, all-off switch.
 
 ---
 

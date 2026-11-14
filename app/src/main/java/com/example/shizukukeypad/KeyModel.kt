@@ -293,6 +293,7 @@ object KeyStore {
     private const val K_ALPHA = "alpha"
     private const val K_FULLSCREEN_MOUSE = "fullscreen_mouse"
     private const val K_ONE_KEY = "one_key_on"
+    private const val K_HOT_MODE = "hot_mode"
     private const val K_MOUSE_GAIN = "mouse_gain"
     private const val K_GAME_KEYBOARD = "game_keyboard"
     private const val K_PANEL_WIDTH = "panel_width_dp"
@@ -492,7 +493,7 @@ object KeyStore {
     }
 
     /** 鼠标拖动方式：false = 小触控板，true = 全屏拖动 */
-    fun loadFullScreenMouse(ctx: Context): Boolean = sp(ctx).getBoolean(K_FULLSCREEN_MOUSE, false)
+    fun loadFullScreenMouse(ctx: Context): Boolean = sp(ctx).getBoolean(K_FULLSCREEN_MOUSE, true)
 
     fun saveFullScreenMouse(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(K_FULLSCREEN_MOUSE, value).apply()
@@ -510,6 +511,13 @@ object KeyStore {
 
     fun saveOneKeyOn(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(K_ONE_KEY, value).apply()
+    }
+
+    /** 多点触控总开关：true = 所有按键穿透触摸，靠旁听触摸屏坐标触发 */
+    fun loadHotMode(ctx: Context): Boolean = sp(ctx).getBoolean(K_HOT_MODE, true)
+
+    fun saveHotMode(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(K_HOT_MODE, value).apply()
     }
 
     /** 整块游戏键盘开关 */
