@@ -15,3 +15,7 @@ local.properties
 # Signing material (never commit)
 *.keystore
 *.jks
+
+# Signing config (never commit the real one)
+keystore.properties
+keystore.properties.bak

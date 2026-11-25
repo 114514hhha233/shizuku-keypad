@@ -16,22 +16,30 @@
     <string name="btn_hide_virtual_keys">Hide virtual keys</string>
     <string name="btn_reset_layout">Reset layout</string>
     <string name="section_presets">Presets</string>
-    <string name="presets_desc">Presets are stored on this device; exported JSON can be backed up or shared via the clipboard</string>
+    <string name="presets_desc">Presets are stored on this device; the layout can be exported to a JSON file for backup or sharing</string>
     <string name="btn_save_preset">Save preset</string>
     <string name="btn_load_preset">Load preset</string>
-    <string name="btn_export_clipboard">Export to clipboard</string>
-    <string name="btn_import_clipboard">Import from clipboard</string>
+    <string name="btn_export_file">Export to file</string>
+    <string name="btn_import_file">Import from file</string>
+    <string name="toast_exported_file">Exported to %1$s</string>
+    <string name="toast_export_failed">Export failed: %1$s</string>
+    <string name="toast_import_read_failed">Could not read this file</string>
+    <string name="toast_invalid_config_file">This file is not a valid layout profile</string>
+    <string name="toast_no_file_picker">No file picker available on this device</string>
+    <string name="dialog_import_file">Import layout file</string>
+    <string name="dialog_import_file_message">%1$d keys%2$s. Importing overwrites the current layout. Continue?</string>
+    <string name="import_includes_settings">, with appearance and mouse settings</string>
+    <string name="import_includes_presets">, plus %1$d presets</string>
+    <string name="toast_config_imported_count">Imported %1$d keys</string>
     <string name="section_appearance">Appearance</string>
     <string name="alpha_label">Key opacity: %1$d%%</string>
     <string name="alpha_label_default">Key opacity: 100%</string>
     <string name="mouse_gain_label">Mouse sensitivity: %1$d%%</string>
     <string name="mouse_gain_label_default">Mouse sensitivity: 150%</string>
-    <string name="full_screen_mouse">Full-screen mouse drag</string>
-    <string name="full_screen_mouse_desc">Off: drag on a small touchpad, game touches are unaffected\nOn: drag anywhere on the screen, but takes over full-screen touch\nAlso works full-screen: tap for left click, two-finger tap for right click, two-finger swipe to scroll</string>
     <string name="block_ime">Block system IME</string>
     <string name="block_ime_desc">On: while virtual keys are shown, a built-in blank IME takes over so the system keyboard cannot cover the screen or turn letters into Chinese\nRestores the previous IME when keys are hidden or the app exits\nRequires Shizuku authorization</string>
     <string name="section_help">Instructions</string>
-    <string name="help_text">① Start Shizuku and authorize it, then grant overlay permission\n② Turn on “Show floating keys” and switch to the game\n\nToolbar:\n· ≡ Drag the whole toolbar; long-press to hide the control menu (reopen the app to restore)\n· Edit: keys can be dragged freely; tap a key to change its key/label/injection method or delete it\n· ＋: Add a key; letters, digits, F1-F12, arrow keys, numpad and mouse keys are built in, and a custom key code can be entered\n· Macro: tap once and then tap a custom key, enter a sequence such as Ctrl+Shift+K or W,Space,A\n· Save / Load: save the current layout as a named preset, or load/delete presets\n· One-key: master switch. Keys with “One-key switch” checked are hidden when the master switch is off and restored when it is on again\n· Full: 5-row compact keyboard. When Caps is lit, Shift stays held; tap again to turn it off. “Sym” switches to the symbols/F1-F12 page. Drag the top ≡ to move; pinch with two fingers to resize\n· Mouse: toggle the virtual mouse; drag with one finger on the touchpad to move the cursor, tap for left click, two-finger tap for right click, two-finger swipe to scroll, long-press to toggle left-button hold\n· Mouse keys: always available, positioned at the virtual mouse\n\nInjection methods:\n· Keyboard event: cloud gaming / keyboard-enabled apps, can be held down\n· Touch tap: native mobile games; the position stays touched while the key is held\n· Mouse button: sends mouse button events at the virtual mouse position\n\nPresets: the home screen can save/load multiple key layouts, export to the clipboard, or import from the clipboard</string>
+    <string name="help_text">① Start Shizuku and authorize it, then grant overlay permission\n② Turn on “Show floating keys” and switch to the game\n\nToolbar:\n· ≡ Drag the whole toolbar; long-press to hide the control menu (reopen the app to restore)\n· Edit: keys can be dragged freely; tap a key to change its key/label/injection method or delete it\n· ＋: Add a key; letters, digits, F1-F12, arrow keys, numpad and mouse keys are built in, and a custom key code can be entered\n· Macro: tap once and then tap a custom key, enter a sequence such as Ctrl+Shift+K or W,Space,A\n· Save / Load: save the current layout as a named preset, or load/delete presets\n· One-key: master switch. Keys with “One-key switch” checked are hidden when the master switch is off and restored when it is on again\n· Full: 5-row compact keyboard. When Caps is lit, Shift stays held; tap again to turn it off. “Sym” switches to the symbols/F1-F12 page. Drag the top ≡ to move; pinch with two fingers to resize\n· Mouse: toggle the virtual mouse; drag with one finger on the touchpad to move the cursor, tap for left click, two-finger tap for right click, two-finger swipe to scroll, long-press to toggle left-button hold\n· Mouse keys: always available, positioned at the virtual mouse\n\nInjection methods:\n· Keyboard event: cloud gaming / keyboard-enabled apps, can be held down\n· Touch tap: native mobile games; the position stays touched while the key is held\n· Mouse button: sends mouse button events at the virtual mouse position\n\nPresets: the home screen can save/load multiple key layouts; “Export to file” writes a complete layout profile (keys, toolbar position, appearance and mouse settings, presets) and “Import from file” overwrites the current layout after confirmation</string>
     <string name="help_note">Keys are fixed to a dark background with a white border and do not change color when pressed</string>
     <string name="about_link">About the app &amp; author  ›</string>
     <string name="about_link_with_version">%1$s · About the app &amp; author  ›</string>
@@ -59,8 +67,6 @@
     <string name="help_q1_body">· If a key does nothing in the game, tap “Edit” in the toolbar, tap the key and switch its injection method to “Touch tap”; keep “Keyboard event” for cloud gaming.\n· Make sure both dots on the status card are green.\n· In multi-touch mode, press the key’s actual position; you can still press keys while dragging the camera.</string>
     <string name="help_q2_title">New keys do not respond while dragging the camera</string>
     <string name="help_q2_body">This is not a permission issue but Android touch ownership: once the first finger lands on the game window, other fingers belong to the game and overlay keys never receive them.\nTurn on “Multi-touch” in the toolbar: keys stop stealing touches and are triggered by listening to raw touch coordinates, so you can press new keys while dragging.\nIn multi-touch mode the mouse left/right/middle buttons and wheel also work, and tapping an empty area acts as a left click. The joystick is not supported in multi-touch mode yet.</string>
-    <string name="help_q3_title">Native touch stops dragging after enabling full-screen mouse</string>
-    <string name="help_q3_body">In window mode, full-screen mouse must cover the screen with a touch layer to receive drags, so native touch is blocked — an unavoidable system-level trade-off.\nMulti-touch mode removes that layer, so native touch reaches the game. However, if the game switches to “mouse look” after receiving mouse movement, the camera stops following touch; that is the game’s own input-mode switch, not the key layer stealing touches.\nIf you need native touch, tap “Mouse” in the toolbar to turn the virtual mouse off.</string>
     <string name="help_q4_title">IME covers the screen / letters turn into Chinese</string>
     <string name="help_q4_body">Turn on “Block system IME” on the main screen: a built-in blank IME takes over while keys are shown, and the previous IME is restored when keys are hidden or the app exits.\nRequires Shizuku authorization.</string>
     <string name="help_q5_title">Shizuku or overlay permission is not ready</string>
@@ -68,7 +74,7 @@
     <string name="help_q6_title">Change key position, size and key code</string>
     <string name="help_q6_body">Tap “Edit” in the toolbar to drag keys; tap a key to change its key code, label, size, shape, injection method, or delete it.\n“＋” adds keys: letters, digits, F1-F12, arrows, numpad and mouse buttons are built in. “Macro” binds a key sequence to one key.</string>
     <string name="help_q7_title">Presets, backup and restore</string>
-    <string name="help_q7_body">“Presets” on the main screen saves/loads multiple layouts; the exported JSON can be backed up or shared via the clipboard, and importing overwrites the current layout.\n“Reset layout” clears custom keys.</string>
+    <string name="help_q7_body">“Presets” on the main screen saves/loads multiple layouts; “Export to file” writes a complete JSON profile (key layout, toolbar position, opacity, mouse sensitivity, toggles and presets) that you can back up or share, and “Import from file” shows a summary before overwriting the current layout.\n“Reset layout” clears custom keys.</string>
 
     <!-- Status -->
     <string name="shizuku_not_running">Shizuku: not running</string>
@@ -183,10 +189,7 @@
     <string name="toast_game_keyboard_on">Full keyboard opened; drag the top handle to move it</string>
     <string name="toast_game_keyboard_off">Full keyboard closed</string>
     <string name="toast_mouse_off">Virtual mouse disabled</string>
-    <string name="toast_mouse_fullscreen_hint">Drag anywhere to move the mouse; tap to left-click</string>
     <string name="toast_mouse_pad_hint">Drag the touchpad to move the mouse; tap the touchpad to click</string>
-    <string name="toast_switched_fullscreen">Switched to full-screen drag</string>
-    <string name="toast_switched_touchpad">Switched to touchpad</string>
     <string name="touchpad_hint">Drag with one finger · tap for left click\nTwo-finger tap for right click · two-finger swipe to scroll\nLong press to toggle left-button hold</string>
     <string name="toast_left_held">Left button held; tap the touchpad to release</string>
     <string name="toast_left_released">Left button released</string>

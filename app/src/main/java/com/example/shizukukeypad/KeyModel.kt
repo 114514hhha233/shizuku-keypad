@@ -291,7 +291,6 @@ object KeyStore {
     private const val K_BAR = "bar"
     private const val K_SEEDED = "seeded"
     private const val K_ALPHA = "alpha"
-    private const val K_FULLSCREEN_MOUSE = "fullscreen_mouse"
     private const val K_ONE_KEY = "one_key_on"
     private const val K_HOT_MODE = "hot_mode"
     private const val K_MOUSE_GAIN = "mouse_gain"
@@ -422,6 +421,119 @@ object KeyStore {
         sp(ctx).edit().putString(K_PRESETS, all.toString()).apply()
     }
 
+    // ==================== 整份布局档案（文件导入导出） ====================
+
+    /** 档案格式标识，写在文件头，导入时用来认领 */
+    const val PROFILE_FORMAT = "hjm-keypad-layout"
+
+    /** 档案版本：1 = 只有按键数组（旧版剪贴板导出），2 = 按键 + 外观 + 鼠标参数 + 预设 */
+    const val PROFILE_VERSION = 2
+
+    /** 导入前的概览，给确认框用 */
+    data class ProfilePreview(
+        val version: Int,
+        val keyCount: Int,
+        val presetCount: Int,
+        val hasSettings: Boolean
+    )
+
+    /** 把整份布局（按键 + 工具栏位置 + 外观/鼠标参数 + 预设）打成一个可存档的 JSON 文件 */
+    fun exportProfile(ctx: Context): String {
+        val root = JSONObject()
+        root.put("format", PROFILE_FORMAT)
+        root.put("version", PROFILE_VERSION)
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("keys", keysToJson(loadKeys(ctx)))
+        root.put("alpha", loadAlpha(ctx))
+        root.put("mouseGain", loadMouseGain(ctx))
+        root.put("hotMode", loadHotMode(ctx))
+        root.put("oneKeyOn", loadOneKeyOn(ctx))
+        root.put("gameKeyboard", loadGameKeyboard(ctx))
+        root.put("panelWidthDp", loadPanelWidthDp(ctx))
+        root.put("blockIme", loadBlockIme(ctx))
+        val bar = loadToolbar(ctx)
+        root.put(
+            "toolbar",
+            if (bar == null) JSONObject.NULL
+            else JSONArray().put(bar.x.toDouble()).put(bar.y.toDouble())
+        )
+        root.put("presets", presetsJson(ctx))
+        return root.toString(2)
+    }
+
+    /** 只解析档案、不落盘，用于导入前确认 */
+    fun previewProfile(raw: String): ProfilePreview? {
+        val text = raw.trim()
+        if (text.isEmpty()) return null
+        // 旧格式兼容：整份就是一个按键数组
+        if (text.startsWith("[")) {
+            val n = sanitizeImport(text).size
+            return if (n > 0) ProfilePreview(1, n, 0, false) else null
+        }
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
+        val arr = root.optJSONArray("keys") ?: return null
+        val n = sanitizeImport(arr.toString()).size
+        if (n == 0) return null
+        val presets = root.optJSONObject("presets")?.length() ?: 0
+        val hasSettings = root.has("alpha") || root.has("mouseGain") || root.has("hotMode") ||
+            root.has("panelWidthDp") || root.has("toolbar")
+        return ProfilePreview(root.optInt("version", PROFILE_VERSION), n, presets, hasSettings)
+    }
+
+    /** 导入整份布局档案；返回导入的按键数，0 = 文件无效（原配置不动） */
+    fun importProfile(ctx: Context, raw: String): Int {
+        val text = raw.trim()
+        if (text.isEmpty()) return 0
+        val keysJson: String
+        val root: JSONObject?
+        if (text.startsWith("[")) {
+            keysJson = text
+            root = null
+        } else {
+            root = runCatching { JSONObject(text) }.getOrNull() ?: return 0
+            keysJson = root.optJSONArray("keys")?.toString() ?: return 0
+        }
+        val parsed = normalizeIds(sanitizeImport(keysJson))
+        if (parsed.isEmpty()) return 0
+        val e = sp(ctx).edit()
+        e.putString(K_KEYS, keysToJson(parsed).toString())
+        root?.let { o ->
+            // 外观与鼠标参数一起带过来，换机/分享时才是一份「完整布局」
+            if (o.has("alpha")) e.putInt(K_ALPHA, o.optInt("alpha", 100).coerceIn(30, 100))
+            if (o.has("mouseGain")) e.putInt(K_MOUSE_GAIN, o.optInt("mouseGain", 150).coerceIn(50, 250))
+            if (o.has("hotMode")) e.putBoolean(K_HOT_MODE, o.optBoolean("hotMode", true))
+            if (o.has("oneKeyOn")) e.putBoolean(K_ONE_KEY, o.optBoolean("oneKeyOn", true))
+            if (o.has("gameKeyboard")) e.putBoolean(K_GAME_KEYBOARD, o.optBoolean("gameKeyboard", false))
+            if (o.has("panelWidthDp")) {
+                e.putInt(K_PANEL_WIDTH, o.optInt("panelWidthDp", 0).coerceIn(200, 1400))
+            }
+            if (o.has("blockIme")) e.putBoolean(K_BLOCK_IME, o.optBoolean("blockIme", false))
+            o.optJSONArray("toolbar")?.let { t ->
+                val x = t.optDouble(0, -1.0).toFloat()
+                val y = t.optDouble(1, -1.0).toFloat()
+                if (x in 0f..1f && y in 0f..1f) {
+                    e.putString(K_BAR, JSONArray().put(x.toDouble()).put(y.toDouble()).toString())
+                }
+            }
+            o.optJSONObject("presets")?.let { p -> e.putString(K_PRESETS, p.toString()) }
+        }
+        e.apply()
+        return parsed.size
+    }
+
+    /** 把重复 / 非法 id 重新编号 */
+    private fun normalizeIds(keys: List<KeyItem>): List<KeyItem> {
+        val used = HashSet<Long>()
+        var next = (keys.maxOfOrNull { it.id } ?: 0L) + 1
+        keys.forEach { k ->
+            if (k.id <= 0L || !used.add(k.id)) {
+                k.id = next++
+                used.add(k.id)
+            }
+        }
+        return keys
+    }
+
     /** 当前按键配置导出成可复制的 JSON */
     fun exportKeys(ctx: Context): String =
         sp(ctx).getString(K_KEYS, "[]") ?: "[]"
@@ -431,16 +543,8 @@ object KeyStore {
      * 坐标超出 0..1 或没有标签的条目会被丢弃；id 重复时重新编号。
      */
     fun importKeys(ctx: Context, raw: String): Int {
-        val parsed = sanitizeImport(raw)
+        val parsed = normalizeIds(sanitizeImport(raw))
         if (parsed.isEmpty()) return 0
-        val used = HashSet<Long>()
-        var next = (parsed.maxOfOrNull { it.id } ?: 0L) + 1
-        parsed.forEach { k ->
-            if (k.id <= 0 || !used.add(k.id)) {
-                k.id = next++
-                used.add(k.id)
-            }
-        }
         sp(ctx).edit().putString(K_KEYS, keysToJson(parsed).toString()).apply()
         return parsed.size
     }
@@ -492,13 +596,6 @@ object KeyStore {
         sp(ctx).edit().putInt(K_ALPHA, value.coerceIn(30, 100)).apply()
     }
 
-    /** 鼠标拖动方式：false = 小触控板，true = 全屏拖动 */
-    fun loadFullScreenMouse(ctx: Context): Boolean = sp(ctx).getBoolean(K_FULLSCREEN_MOUSE, true)
-
-    fun saveFullScreenMouse(ctx: Context, value: Boolean) {
-        sp(ctx).edit().putBoolean(K_FULLSCREEN_MOUSE, value).apply()
-    }
-
     /** 鼠标拖动灵敏度，50..250（百分比） */
     fun loadMouseGain(ctx: Context): Int = sp(ctx).getInt(K_MOUSE_GAIN, 150).coerceIn(50, 250)
 
@@ -514,7 +611,7 @@ object KeyStore {
     }
 
     /** 多点触控总开关：true = 所有按键穿透触摸，靠旁听触摸屏坐标触发 */
-    fun loadHotMode(ctx: Context): Boolean = sp(ctx).getBoolean(K_HOT_MODE, true)
+    fun loadHotMode(ctx: Context): Boolean = sp(ctx).getBoolean(K_HOT_MODE, false)
 
     fun saveHotMode(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(K_HOT_MODE, value).apply()

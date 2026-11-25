@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Shizuku](https://img.shields.io/badge/Shizuku-13.x-6a5acd)](https://shizuku.rikka.app/)
 
-**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/download/v1.7/HJM-Keypad-1.7.apk)** ·
+**[⬇ Download APK](https://github.com/114514hhha233/shizuku-keypad/releases/latest)** ·
 [Source](https://github.com/114514hhha233/shizuku-keypad) ·
 [Issues](https://github.com/114514hhha233/shizuku-keypad/issues)
 
@@ -23,7 +23,7 @@ HJM Keypad (formerly "Hajimi Virtual Keypad") adds a freely placeable virtual ke
 
 - App name: HJM Keypad (package name unchanged; upgrades over previous installs)
 - Package: `com.example.shizukukeypad`
-- Version: 1.7 (versionCode 10)
+- Version: 1.7.2 (versionCode 32)
 - Min Android: 8.0 (API 26), targetSdk / compileSdk 34
 - Dependencies: Shizuku 13.x (`dev.rikka.shizuku:api/aidl/provider:13.1.5`), Material Components 1.12
 - Language: follows the system; Simplified Chinese and English included
@@ -32,7 +32,7 @@ HJM Keypad (formerly "Hajimi Virtual Keypad") adds a freely placeable virtual ke
 
 ---
 
-## Multi-touch (core, on by default)
+## Multi-touch (core, off by default)
 
 This is the most important part of the project: **coordinate-based hot zones make "drag the camera and press a new key at the same time" actually work.**
 
@@ -62,16 +62,16 @@ In multi-touch mode every key window is set to `FLAG_NOT_TOUCHABLE`, so keys no 
 - **Press new keys while dragging the camera**: the first finger can be on the game, later fingers still trigger keys;
 - several fingers can hold different keys at once without interference;
 - keys no longer block touches — the game keeps its native touch input;
-- mouse left/right/middle buttons and the wheel work in multi-touch mode; the full-screen mouse supports multi-finger cursor dragging, and tapping empty space acts as a left click.
+- mouse left/right/middle buttons and the wheel work in multi-touch mode; tap a mouse key for a single click. empty space acts as a left click.
 
 ### Multi-touch vs window mode
 
-| | Multi-touch (default) | Window mode |
+| | Multi-touch | Window mode |
 | --- | --- | --- |
 | Key windows | all non-touchable | separate windows + `FLAG_SPLIT_TOUCH` |
 | First finger | can land anywhere | must land on a key window |
 | Press keys while dragging camera | ✅ yes | ❌ later fingers are lost |
-| Native touch | fully preserved | blocked by full-screen mouse |
+| Native touch | fully preserved | fully preserved |
 | Joystick / trackpad gestures | ❌ not supported | ✅ supported |
 | Requires | Shizuku + `getevent` listening | Shizuku injection |
 
@@ -98,8 +98,8 @@ The toolbar "◈ Multi-touch" button is on by default; tap it to switch to "Wind
 - The joystick is not supported in multi-touch mode yet; use window mode.
 
 ### Mouse
-- **Full-screen mouse** (default): slide anywhere to move the cursor; tap for left click, two-finger tap for right click, two-finger swipe for the wheel.
-- **Trackpad**: a small panel to drag the cursor (long-press the toolbar "↖ Mouse" to toggle).
+- **Touchpad**: drag on the small panel to move the cursor; tap for left click, two-finger tap for right click, two-finger swipe for the wheel, long press to hold the left button.
+- **Mouse buttons**: a press completes a single 50ms click immediately (left button), no need to wait for release; right/middle stay at 120ms.
 - The cursor is its own window; mouse buttons are injected at the cursor position; sensitivity 50%–250%.
 
 ### Full keyboard
@@ -111,7 +111,8 @@ The toolbar "◈ Multi-touch" button is on by default; tap it to switch to "Wind
 - In edit mode, drag keys, tap to edit, long-press to delete.
 - The key dialog uses grouped cards: key, display, behavior, joystick and injection method are separated; size has common presets.
 - Layout / opacity / sensitivity / toggles persist via `SharedPreferences + JSON`; positions are stored as 0–1 ratios, so rotation and resolution changes never misplace them.
-- Preset management and config import/export (clipboard JSON).
+- Preset management: save / load named presets.
+- **Layout import/export as files**: "Export to file / Import from file" on the main screen, using the system file picker (SAF, no storage permission). The exported `hjm-keypad-layout-*.json` carries the key layout, toolbar position, key opacity, mouse sensitivity, multi-touch / full-screen mouse / one-key / full keyboard / keyboard width toggles and all presets, so moving to another device or sharing with a friend is one complete package. Import shows a summary first, then reloads the overlay. Old plain key-array JSON files still import.
 - Optional "block system IME": while keys are shown, a blank IME replaces the system keyboard to avoid occlusion or letter-to-CJK conversion.
 - Main screen uses Material 3 with Android 12+ dynamic color; includes a dedicated help / FAQ page.
 
@@ -134,8 +135,8 @@ If all keys were drawn in one large window, that window would cover the whole sc
 ### 3. Why multi-touch listens to evdev
 See the "Multi-touch" section above: touch streams have ownership, an injected fake finger can't occupy a slot, so the app listens to raw touchscreen events instead — read-only, the game still gets native touch, and those coordinates drive the key hot zones. The transform is `(raw - min) / (max - min)` followed by the screen-orientation rotation.
 
-### 4. Window mode vs full-screen mouse
-A full-screen mouse must place a full-screen touch layer to receive drags, and that layer blocks native touch — an unavoidable consequence of window dispatch. Multi-touch mode removes that layer, so native touch reaches the game; but if a game switches to "mouse look" after receiving injected mouse movement, the camera stops following touch. That is the game's own input-mode switch, not the overlay stealing touches.
+### 4. Why the virtual mouse only uses a small touchpad
+The virtual mouse only places a small touchpad window to receive drags. A full-screen touch layer would allow dragging anywhere, but it blocks native touch so camera swipes stop working in games — that approach has been removed. Note that a game may switch to "mouse look" after receiving injected mouse movement; that is the game's own input-mode switch, not the overlay stealing touches.
 
 ### 5. Move out of the way before injecting
 Injected events hit the topmost touchable window. If our overlay is in the way, the injection bounces back to us, so blocking windows are temporarily set to `FLAG_NOT_TOUCHABLE` and restored afterwards.
@@ -149,7 +150,7 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 
 - Multi-touch mode depends on Shizuku and `getevent`; some devices use different touch device nodes or coordinate systems and may not work.
 - Multi-touch does not capture native touch, so key presses are also delivered to the game underneath.
-- Full-screen mouse + window mode blocks native touch; use multi-touch or turn the virtual mouse off if you need native touch.
+- The virtual mouse only drags on the small touchpad (the full-screen drag approach was removed) to keep native touch intact.
 - The joystick and trackpad gestures (two-finger tap, etc.) are not supported in multi-touch mode.
 - Injected touches are a separate input stream; a few games may ignore them.
 - No iOS / no-Shizuku mode.
@@ -158,7 +159,7 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 
 ## Install & usage
 
-1. Download `HJM-Keypad-1.7.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
+1. Download the latest `HJM-Keypad-*.apk` from [Releases](https://github.com/114514hhha233/shizuku-keypad/releases) and install it.
 2. Install [Shizuku](https://shizuku.rikka.app/) and start its service via `adb shell` or root as described in its documentation.
 3. Open the app and grant "Display over other apps" and notification permissions.
 4. Tap "Authorize Shizuku"; the status should become connected.
@@ -187,6 +188,7 @@ The release APK is debug-signed and installs as an upgrade over previous builds 
 | File | Responsibility |
 | --- | --- |
 | `KeypadOverlay.kt` | Overlay core: key windows, touch dispatch, injection, joystick, trackpad, full keyboard, multi-touch hot zones, toolbar |
+| `MouseEngine.kt` | Hover injection ticker: fixed-rate, async, always sends the latest cursor position so low-end devices stay smooth |
 | `EvdevTouch.kt` | Shizuku listener for raw touchscreen events; outputs screen coordinates |
 | `KeyModel.kt` | Key model, key catalog, macro parser, persistence |
 | `JoystickPad.kt` | Joystick widget |
@@ -217,6 +219,13 @@ The app requests no network permission and collects no data; configuration stays
 
 ## Changelog
 
+- 1.7.2: **layout import/export moved to files** (SAF picker, a `.json` profile carrying keys + toolbar position + appearance/mouse settings + presets, still accepting the old plain key-array format, with a summary before import); **left-click timing** is now "warm up hover → hold 160ms → release", which fixes a real finger press only blinking the icon and needing a second press (human press-release is usually 120–200ms, the previous 80ms got treated as an accidental touch on some ROMs); three "stuck until restart" latches are gone:
+  (1) before injecting we temporarily set the overlay windows under the pointer (including the touchpad) to not-touchable but restored them only after the inject returned — on old versions "wait for dispatch" can block for hundreds of ms or never return, leaving the touchpad permanently dead; restoration now runs on a hard 280ms alarm regardless of the inject;
+  (2) once an evdev finger was unbound (200ms idle, or a two-finger gesture ending) the old code could only rebind on a fresh touch-down, so one pause pushed the rest of the drag onto the ~5/s window channel; it is now re-claimed by position immediately;
+  (3) the `getevent` self-heal never actually worked (`stop()` did not clear the thread reference, so `start()` saw the old thread alive and returned); also, if three consecutive hover injections take longer than 40ms the pacer degrades to async instead of being dragged by the system.
+- 1.7.1: **touchpad motion fully off the UI thread**. In 1.7 the whole pipeline (evdev callback → `ui.post` → gesture dispatch → pacer) lived on the UI thread, so any other app stealing CPU collapsed the injection cadence — exactly "it stalls sooner once you open another app". The evdev thread now computes the motion and feeds the injector directly; only the cursor redraw hops to the UI thread, coalesced to at most one per 8ms. The pad telemetry's fourth cell is inject cost plus send/reject counters.
+- 1.7.2: **full-screen cursor dragging removed** (that full-screen touch layer blocked native touch, so camera swipes stopped working); the virtual mouse now only drags on the small touchpad. **Left-button click shortened to 50ms**: a press completes a full click instantly, no more 160ms long-press tail. Also fixed the full-screen injection that could leave the touch layer shrunk to 1×1 forever and kill all gestures; multi-touch (hot-zone) mode now defaults to off.
+- 1.7.0: touchpad motion driven by **raw touchscreen samples listened through Shizuku**, picking the denser channel automatically (the window channel yields only a few events per second on 12/13, the real cause of the choppy cursor); re-claim by position after a two-finger gesture or a listen gap; two-finger right click deferred until all fingers are up; mouse buttons sent as down/up pairs (up always sent, false negatives accepted, right-click falling back to a long press); pressed-state visuals held for at least 180ms.
 - 1.7: renamed to **HJM Keypad**, new cat-keyboard adaptive icon, multi-touch mode on by default (evdev listening + coordinate hot zones), Material 3 main screen with dynamic color, dedicated help / FAQ page, redesigned key dialog, full-screen mouse multi-finger drag and tap-to-left-click.
 - 1.6: full keyboard, hot-zone experiment, i18n, key size presets.
 - 1.5: preset keys, common-size picker, all-off switch.
