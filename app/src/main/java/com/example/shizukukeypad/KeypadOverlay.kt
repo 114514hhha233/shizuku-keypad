@@ -32,13 +32,16 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.util.Log
 import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import rikka.shizuku.Shizuku
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
@@ -63,11 +66,8 @@ class KeypadOverlay(private val context: Context) {
     private val ui = Handler(Looper.getMainLooper())
     // 多线程注入：多个按键同时按下时不会排队等待，触控延迟更低
     private val worker = Executors.newFixedThreadPool(4)
-    // 鼠标悬停单独一条串行线程：旧机型单次注入要十几毫秒，
-    // 丢掉中间帧比排队更稳，拖动才不会一顿一顿
-    private val hoverWorker = Executors.newSingleThreadExecutor()
-    @Volatile
-    private var hoverBusy = false
+    // 悬停注入不再走这里：统一交给 MouseEngine 的固定节拍线程 +
+    // 异步注入（旧代码是每条采样丢给串行线程、忙时就丢帧，低版本上就一顿一顿）
     private val density = context.resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val themeCtx = ContextThemeWrapper(context, android.R.style.Theme_Material_Light)
@@ -160,18 +160,93 @@ class KeypadOverlay(private val context: Context) {
     private var allKeysOff = false
 
     private var cursorView: View? = null
+    private var cursorArrow: MouseCursorView? = null
     private var cursorParams: WindowManager.LayoutParams? = null
     private var dragLayer: View? = null
     private var dragParams: WindowManager.LayoutParams? = null
-    private var fullScreenDrag = false
     private var mouseOn = false
 
     /** 触控板拖动状态：触控板窗口或按键窗口转发过来的手指共用 */
+    // 触控板手势状态会被两条线程触碰：手势起止在 UI 线程，位移在旁听线程，
+    // 所以这些都标 volatile，并用 padLock 串行化状态变更
+
+    /** 按键按下时刻（防呆用：卡住的旧按下会被作废） */
+    private val keyPressAt = HashMap<Long, Long>()
+
+    /** 鼠标键上次注入时刻：150ms 内重复触发只算一次，避免偶发双击 */
+    // 鼠标键点击不再做时间窗去重：窗口重排造成的重复触发已由 pressCounts 挡住
+
+    @Volatile
     private var padDragActive = false
+
+    /** 触控板是否正处在双指手势（右键 / 滚轮）：双指期间不认旁听手指 */
+    @Volatile
+    private var padTwoActive = false
+    @Volatile
     private var padDragMoved = false
+
+    /** 触控板状态锁 */
+    private val padLock = Any()
+
+    /** 触控板在屏幕上的矩形（旁听线程不能调 View.getLocationOnScreen，只能读缓存） */
+    @Volatile
+    private var padRectL = 0
+    @Volatile
+    private var padRectT = 0
+    @Volatile
+    private var padRectR = 0
+    @Volatile
+    private var padRectB = 0
     private var padDragLastX = 0f
     private var padDragLastY = 0f
-    private var padDragLastInject = 0L
+    // 注入节拍由 MouseEngine 统一控制，这里不再自己做 16ms 节流
+
+    // ---------------- 触控板：旁听坐标驱动 ----------------
+    //
+    // 安卓 12/13 上，浮窗收到的触摸事件会被系统压成「一帧一条」（实测只有 5 条/秒），
+    // 位移曲线就被削成几段，光标自然一顿一顿。触摸屏的原始采样在 /dev/input 里是全的
+    // （通常 60~120 条/秒），Shizuku 旁听已经在内置热区按键里跑通了，所以触控板也改成：
+    //   窗口只负责「开始/结束手势」，位移全部由旁听坐标喂给光标。
+    // 两条通道绝不同时生效，否则位移会翻倍；旁听不可用时自动退回窗口事件。
+
+    /** 当前绑定到触控板的内置手指 id（-1 = 没绑上） */
+    @Volatile
+    private var padEvdevId = -1
+
+    /** 绑定时该手指的位置，用来算相邻两帧的位移 */
+    private val padEvdevLast = PointF()
+
+    /** 本次拖动累计位移，用来判断是「拖动」还是「轻点」 */
+    private var padEvdevTravel = 0f
+
+    /** 等旁听按下事件与窗口按下点对齐的时间/位置（旁听可能比窗口晚到） */
+    private var padArmAt = 0L
+    private var padArmX = 0f
+    private var padArmY = 0f
+
+    /** 最近一次落在触控板里的内置手指，窗口 ACTION_DOWN 到达时用它绑定 */
+    @Volatile
+    private var padFingerId = -1
+    @Volatile
+    private var padFingerAt = 0L
+    @Volatile
+    private var padFingerX = 0f
+    @Volatile
+    private var padFingerY = 0f
+
+    /** 上一次拖动结束后判定：下一次位移用哪条通道（默认旁听） */
+    private var padUseEvdev = true
+    private var padArmed = false
+
+    /** 本次拖动里两条通道各收到多少条位移采样（诊断数字 + 下次选通道） */
+    private var dragWinMoves = 0
+    private var padEvdevMoves = 0
+
+    /** 最近一次旁听位移的时间戳，用来发现旁听断流并退回窗口通道 */
+    private var padEvdevLastAt = 0L
+
+    /** 旁听发来 UP 的时间戳（可能是 tracking 抖动，先留一段宽限期） */
+    private var padEvdevLostAt = 0L
 
     /** 从按键窗口转交给触控板的那根手指 */
     private var externalPadToken: String? = null
@@ -180,11 +255,17 @@ class KeypadOverlay(private val context: Context) {
     /** 鼠标灵敏度倍率，来源是主页滑条（50%..250%） */
     private var mouseGain = 1.5f
 
-    /** 拖拽锁定：左键是否处于按住状态 */
+    /** 拖拽锁定：左键是否处于按住状态。节拍线程要读，必须是 volatile */
+    @Volatile
     private var mouseLeftHeld = false
 
+    /** 鼠标注入失败提示的节流时间戳 */
+    private var lastMouseFailToastAt = 0L
+
     // 虚拟鼠标当前位置（屏幕像素），鼠标按键就注入在这里
+    @Volatile
     private var mouseX = 0f
+    @Volatile
     private var mouseY = 0f
 
     // 光标窗口的真实屏幕位置与 LayoutParams 的差值（状态栏/挖孔/导航栏内缩）
@@ -430,15 +511,8 @@ class KeypadOverlay(private val context: Context) {
                 cursorParams?.let { p -> runCatching { wm.updateViewLayout(v, p) } }
             }
             dragParams?.let { p ->
-                if (fullScreenDrag) {
-                    p.width = screenW
-                    p.height = screenH
-                    p.x = 0
-                    p.y = 0
-                } else {
-                    p.x = p.x.coerceIn(0, max(0, screenW - dp(140)))
-                    p.y = p.y.coerceIn(0, max(0, screenH - dp(120)))
-                }
+                p.x = p.x.coerceIn(0, max(0, screenW - dp(140)))
+                p.y = p.y.coerceIn(0, max(0, screenH - dp(120)))
                 dragLayer?.let { v -> runCatching { wm.updateViewLayout(v, p) } }
             }
         }
@@ -618,11 +692,6 @@ class KeypadOverlay(private val context: Context) {
             refreshBarLabels()
         }.also { row2.addView(it) }
         btnMouse = barButton("↖", getString(if (mouseOn) R.string.toolbar_mouse_on else R.string.toolbar_mouse), 46) { toggleMousePad() }.also { row2.addView(it) }
-        // 长按鼠标键切换拖动方式：全屏滑动（默认） / 小触控板
-        btnMouse?.setOnLongClickListener {
-            toggleMouseProfile()
-            true
-        }
         btnHot = barButton("◈", getString(if (hotMode) R.string.toolbar_hot_on else R.string.toolbar_hot_off), 54) {
             setHotMode(!hotMode)
         }.also { row2.addView(it) }
@@ -668,10 +737,6 @@ class KeypadOverlay(private val context: Context) {
         // 切换时先把按下的状态清干净，避免卡键
         worker.execute { ShizukuInjector.releaseAll() }
         applyKeyTouchability()
-        // 全屏鼠标：热区模式下撤掉全屏触摸层，改由旁听坐标驱动光标
-        if (mouseOn && fullScreenDrag) {
-            if (on) removeDragLayer() else buildFullScreenLayer()
-        }
         refreshEvdev()
         refreshBarLabels()
         toast(getString(if (on) R.string.toast_hot_on else R.string.toast_hot_off))
@@ -1500,7 +1565,7 @@ class KeypadOverlay(private val context: Context) {
 
     /** 屏幕坐标是否落在触控板上（全屏拖动模式不算） */
     private fun pointInTouchpad(x: Float, y: Float): Boolean {
-        if (!mouseOn || fullScreenDrag) return false
+        if (!mouseOn) return false
         val v = dragLayer ?: return false
         val l = IntArray(2)
         v.getLocationOnScreen(l)
@@ -1514,8 +1579,17 @@ class KeypadOverlay(private val context: Context) {
     ) {
         // 指托不发送任何按键，只负责占住手势
         if (key.type == KeyType.ANCHOR) return
-        val n = pressCounts[key.id] ?: 0
+        // 防呆：抬手指被系统取消时计数可能停在 1，导致「按一下没反应、再按一下才动」。
+        // 超过 8 秒的旧按下直接作废。
+        val nowPress = SystemClock.uptimeMillis()
+        var n = pressCounts[key.id] ?: 0
+        val staleMs = if (key.type.isMouse) 1200L else 8000L
+        if (n > 0 && nowPress - (keyPressAt[key.id] ?: 0L) > staleMs) {
+            pressCounts.remove(key.id)
+            n = 0
+        }
         pressCounts[key.id] = n + 1
+        keyPressAt[key.id] = nowPress
         if (n > 0) return
         setKeyLook(key, true)
         when {
@@ -1537,7 +1611,13 @@ class KeypadOverlay(private val context: Context) {
                 touchKeyDown(key, v, p, loc[0] + v.width / 2f, loc[1] + v.height / 2f)
             }
 
-            else -> injectMouse { doMouseKey(key.type) }
+            // 左/右/中键不在按下时注入：手指还按在按键上时注入鼠标事件（含悬停），
+            // 安卓 12 会立刻把这一整段触摸判成 CANCEL，触摸漏到下面的应用，就成了"点一下变长按"。
+            // 抬手那一刻再发，既干净又不会打断手指自己的触摸。滚轮是一次性动作，仍然按下就发。
+            key.type == KeyType.WHEEL_UP || key.type == KeyType.WHEEL_DOWN ->
+                injectMouse { doMouseKey(key.type) }
+
+            else -> Unit
         }
     }
 
@@ -1552,13 +1632,17 @@ class KeypadOverlay(private val context: Context) {
         }
     }
 
-    private fun releaseKey(key: KeyItem) {
+    private fun releaseKey(key: KeyItem, click: Boolean = true) {
         if (key.type == KeyType.ANCHOR) return
         val n = pressCounts[key.id] ?: 0
         if (n <= 0) return
-        if (n > 1) {
-            pressCounts[key.id] = n - 1
-            return
+        // 鼠标键一次按压就是一次点击，不做计数递减：
+        // 万一收到重复 DOWN，递减会让按下态永远留着
+        if (!key.type.isMouse) {
+            if (n > 1) {
+                pressCounts[key.id] = n - 1
+                return
+            }
         }
         pressCounts.remove(key.id)
         setKeyLook(key, false)
@@ -1567,6 +1651,9 @@ class KeypadOverlay(private val context: Context) {
             key.type == KeyType.KEY -> worker.execute { ShizukuInjector.keyUp(key.keyCode) }
             key.type == KeyType.JOYSTICK -> joyEnd(key)
             key.type == KeyType.TOUCH -> touchKeyUp(key)
+            key.type.isMouse && click && key.type != KeyType.WHEEL_UP && key.type != KeyType.WHEEL_DOWN -> {
+                injectMouse { doMouseKey(key.type) }
+            }
             else -> Unit
         }
     }
@@ -1577,7 +1664,7 @@ class KeypadOverlay(private val context: Context) {
         while (it.hasNext()) {
             val e = it.next()
             if (e.key.startsWith(prefix)) {
-                releaseKey(e.value)
+                releaseKey(e.value, click = false)
                 it.remove()
             }
         }
@@ -1698,10 +1785,11 @@ class KeypadOverlay(private val context: Context) {
     // 每根手指累计移动距离：超过触摸阈值才算拖动，否则抬起时当作左键单击
     private val hotCursorTravel = HashMap<Int, Float>()
     private val hotCursorMoved = HashSet<Int>()
-    private var hotCursorInjectAt = 0L
 
     private fun refreshEvdev() {
-        if (!hotMode || (keys.isEmpty() && !mouseOn)) {
+        // 触控板的位移也靠旁听驱动（12/13 上窗口触摸事件会被压成几帧一条），
+        // 所以只要开着虚拟鼠标，旁听就必须跑着，不能再绑在热区开关上
+        if (!hotMode && !mouseOn) {
             EvdevTouch.listener = null
             EvdevTouch.stop()
             return
@@ -1718,23 +1806,25 @@ class KeypadOverlay(private val context: Context) {
     }
 
     private fun onEvdev(action: Int, id: Int, x: Float, y: Float) {
+        // 触控板位移在旁听线程上直接算，不绕 UI 线程：
+        // 一旦绕过去，别的应用（尤其游戏）把 CPU 一挤，UI 线程一卡，
+        // 注入节奏就跟着塌 —— 用户看到的就是「开着别的软件更容易卡」。
+        // 只有光标重绘那一小步才回到 UI 线程，而且是合并节流的。
+        if (mouseOn && handlePadEvdev(action, id, x, y)) {
+            return
+        }
         ui.post { handleHotTouch(action, id, x, y) }
     }
 
     private fun handleHotTouch(action: Int, id: Int, x: Float, y: Float) {
         if (editMode || allKeysOff) return
-        // 全屏鼠标在热区里靠旁听坐标驱动：多指都能拖，单指轻点即左键
-        val mouseDrag = mouseOn && fullScreenDrag
+        // 触控板的位移已经在 onEvdev 里按旁听线程处理完了，这里只管热区按键
+        if (!hotMode) return
         if (action == EvdevTouch.UP) {
             hotCursorLast.remove(id)?.let {
                 val moved = hotCursorMoved.remove(id)
                 hotCursorTravel.remove(id)
-                if (mouseDrag && !moved) {
-                    // 轻点空白处 = 左键单击（点击落在当前光标位置）
-                    worker.execute { injectMouse { doMouseKey(KeyType.MOUSE_LEFT) } }
-                } else if (mouseDrag) {
-                    injectHoverAtCursor()
-                }
+                if (moved) flushHover()
             }
             hotCursorTravel.remove(id)
             val iter = hotPointers.entries.iterator()
@@ -1760,12 +1850,8 @@ class KeypadOverlay(private val context: Context) {
             if (id !in hotCursorMoved) return
             mouseX = (mouseX + dx * mouseGain).coerceIn(0f, (screenW - 1).toFloat())
             mouseY = (mouseY + dy * mouseGain).coerceIn(0f, (screenH - 1).toFloat())
-            moveCursorWindowToMouse()
-            val now = SystemClock.uptimeMillis()
-            if (now - hotCursorInjectAt >= 16L) {
-                hotCursorInjectAt = now
-                injectHoverAtCursor()
-            }
+            // 箭头立刻跟手，注入交给 MouseEngine 的固定节拍（这里不再自己 16ms 节流）
+            onMouseMoved()
             return
         }
         if (action != EvdevTouch.DOWN) return
@@ -1790,12 +1876,6 @@ class KeypadOverlay(private val context: Context) {
                     pressKey(k, x, y)
                 }
             }
-        }
-        // 没按到按键的手指都用来拖光标；轻点则当作左键
-        if (!hitKey && mouseDrag) {
-            hotCursorLast[id] = PointF(x, y)
-            hotCursorTravel[id] = 0f
-            hotCursorMoved.remove(id)
         }
     }
 
@@ -1861,9 +1941,13 @@ class KeypadOverlay(private val context: Context) {
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    // 这里必须吃掉 MOVE。真实手指点一下都会带几个 MOVE，
+                    // 一旦返回 false，系统会把这一串触摸收回/转给下层窗口：
+                    // 我们收不到 UP（按下态卡住、下一次点没反应），
+                    // 下面的应用却收到一个永远抬不起来的按下 —— 看起来就是"点一下变长按"。
                     val ext = externalPadToken
                     val hasJoy = pointerTargets.values.any { it.type == KeyType.JOYSTICK }
-                    if (forwardTokens.isEmpty() && ext == null && !hasJoy) return false
+                    if (forwardTokens.isEmpty() && ext == null && !hasJoy) return true
                     view.getLocationOnScreen(loc)
                     for (i in 0 until ev.pointerCount) {
                         val id = ev.getPointerId(i)
@@ -2007,39 +2091,92 @@ class KeypadOverlay(private val context: Context) {
     }
 
     /**
-     * 鼠标按键不依赖某个悬浮窗的位置，所以注入前把所有悬浮窗一起设为不可触摸，
-     * 避免注入的鼠标事件被自己的按钮接走。
+     * 鼠标事件注入前，把「压在光标下面」的悬浮窗临时设为不可触摸，
+     * 否则注入的鼠标事件会被自己的按钮接住，游戏永远收不到。
+     *
+     * 与旧实现的两点区别（安卓 12/13 上必须这么改）：
+     * 1. 只处理真正盖住光标位置的那几个窗口。以前是把所有按键窗口一起改，
+     *    三四十个窗口改两遍、每遍都是一次 relayout，光这一步就要上百毫秒，点一下又慢又抖。
+     * 2. 窗口参数回到 UI 线程改、并且等它落地。以前在注入线程上调 updateViewLayout，
+     *    低版本上常常「参数改了、窗口还没重排」，注入的按键就打在自家浮层上，等于没注入。
      */
     private fun withOverlayUntouchable(block: () -> Boolean) {
-        val all = mutableListOf<Pair<View, WindowManager.LayoutParams>>()
-        fun add(v: View?, p: WindowManager.LayoutParams?) {
-            if (v != null && p != null) all.add(v to p)
-        }
-        keyViews.forEach { (_, v) -> add(v, v.layoutParams as? WindowManager.LayoutParams) }
-        add(toolbar, toolbarParams)
-        add(cursorView, cursorParams)
-        add(dragLayer, dragParams)
-
+        val px = mouseX
+        val py = mouseY
         val restore = mutableListOf<Pair<View, WindowManager.LayoutParams>>()
-        all.forEach { (v, p) ->
-            if (p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
-                p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                runCatching { wm.updateViewLayout(v, p) }
-                restore.add(v to p)
-            }
+
+        // 只有"真的盖住了光标位置"的窗口才需要让路；而且手指正按着的按键窗口绝对不能让路：
+        // 把按下中的窗口设成不可触摸，系统会给它发 CANCEL，这一下触摸就漏到下面的应用上，
+        // 那个应用只收到按下、收不到抬起 —— 表现就是「轻轻点一下却变成一直按住」。
+        fun flip(v: View?, p: WindowManager.LayoutParams?, pressed: Boolean = false) {
+            if (v == null || p == null || pressed) return
+            if (!coversPoint(v, px, py)) return
+            if (p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0) return
+            p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { wm.updateViewLayout(v, p) }
+            restore.add(v to p)
         }
+
+        keyViews.forEach { (id, v) ->
+            flip(v, v.layoutParams as? WindowManager.LayoutParams, pressCounts.containsKey(id))
+        }
+        flip(toolbar, toolbarParams)
+        flip(dragLayer, dragParams)
+
+        val restoreNow = Runnable {
+            if (restore.isEmpty()) return@Runnable
+            restore.forEach { (v, p) ->
+                p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                runCatching { wm.updateViewLayout(v, p) }
+            }
+            restore.clear()
+        }
+        // 兜底闹钟：注入万一被系统卡住，也要把触摸能力还回去
+        if (restore.isNotEmpty()) ui.postDelayed(restoreNow, 300L)
         worker.execute {
-            SystemClock.sleep(40)
             val ok = runCatching { block() }.getOrDefault(false)
             val err = ShizukuInjector.lastErrorText(context)
+            val diag = ShizukuInjector.lastMouseDiag
             ui.postDelayed({
-                restore.forEach { (v, p) ->
-                    p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                    runCatching { wm.updateViewLayout(v, p) }
+                ui.removeCallbacks(restoreNow)
+                restoreNow.run()
+                if (!ok) {
+                    val nowMs = SystemClock.uptimeMillis()
+                    if (nowMs - lastMouseFailToastAt > 1500L) {
+                        lastMouseFailToastAt = nowMs
+                        val base = err.ifBlank { getString(R.string.unknown_reason) }
+                        toast(
+                            getString(
+                                R.string.toast_mouse_inject_failed,
+                                if (diag.isBlank()) base else "$base · $diag"
+                            )
+                        )
+                    }
                 }
-                if (!ok) toast(getString(R.string.toast_mouse_inject_failed, err.ifBlank { getString(R.string.unknown_reason) }))
             }, 15)
         }
+    }
+
+    /** 在 UI 线程上提交一次窗口参数改动；工作线程调用时等它真正提交完再往下走 */
+    private fun applyLayout(v: View, p: WindowManager.LayoutParams) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            runCatching { wm.updateViewLayout(v, p) }
+            return
+        }
+        val latch = CountDownLatch(1)
+        ui.post {
+            runCatching { wm.updateViewLayout(v, p) }
+            latch.countDown()
+        }
+        runCatching { latch.await(1200, TimeUnit.MILLISECONDS) }
+    }
+
+    /** 这个窗口是否盖住了屏幕坐标 (x, y) */
+    private fun coversPoint(v: View, x: Float, y: Float): Boolean {
+        if (v.width <= 0 || v.height <= 0 || v.visibility != View.VISIBLE) return false
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        return x >= loc[0] && x <= loc[0] + v.width && y >= loc[1] && y <= loc[1] + v.height
     }
 
     /**
@@ -2049,37 +2186,8 @@ class KeypadOverlay(private val context: Context) {
      * 游戏和按键都会明显闪一下（用户说的“点一下控件就刷新”）。
      * 只改尺寸不会重新挂窗口，视觉上完全无感，同时屏幕上也不再有点被这层盖住。
      */
-    private fun injectInFullScreen(block: () -> Boolean) {
-        val v = dragLayer
-        val p = dragParams
-        if (v != null && p != null) {
-            p.width = 1
-            p.height = 1
-            p.x = -2
-            p.y = -2
-            runCatching { wm.updateViewLayout(v, p) }
-        }
-        withOverlayUntouchable {
-            // 系统刚分发完抬起手势，失败一次就稍等重试
-            block() || run {
-                SystemClock.sleep(70)
-                block()
-            }
-        }
-        ui.postDelayed({
-            if (mouseOn && fullScreenDrag && dragLayer === v && v != null && p != null) {
-                p.width = screenW
-                p.height = screenH
-                p.x = 0
-                p.y = 0
-                runCatching { wm.updateViewLayout(v, p) }
-            }
-        }, 120)
-    }
-
-    /** 全屏模式下先摘层再注入，其余情况沿用临时不可触摸 */
     private fun injectMouse(block: () -> Boolean) {
-        if (fullScreenDrag && mouseOn) injectInFullScreen(block) else withOverlayUntouchable(block)
+        withOverlayUntouchable(block)
     }
 
     /** 鼠标按键注入在光标当前位置；鼠标模式只是提供触控板，不打开也能用按键 */
@@ -3032,73 +3140,79 @@ class KeypadOverlay(private val context: Context) {
         }
         mouseOn = true
         refreshBarLabels()
-        fullScreenDrag = KeyStore.loadFullScreenMouse(context)
         buildCursor()
-        if (fullScreenDrag) buildFullScreenLayer() else buildDragLayer()
+        buildDragLayer()
         refreshEvdev()
         raiseOverlayAboveLayer()
-        toast(
-            getString(
-                if (fullScreenDrag) R.string.toast_mouse_fullscreen_hint
-                else R.string.toast_mouse_pad_hint
-            )
-        )
+        toast(getString(R.string.toast_mouse_pad_hint))
     }
 
-    /** 主界面切换拖动方式后立刻生效 */
-    fun setFullScreenMode(enabled: Boolean) {
-        ui.post {
-            if (fullScreenDrag == enabled) return@post
-            fullScreenDrag = enabled
-            if (!mouseOn) return@post
-            removeDragLayer()
-            if (fullScreenDrag) buildFullScreenLayer() else buildDragLayer()
-            raiseOverlayAboveLayer()
-            toast(getString(if (fullScreenDrag) R.string.toast_switched_fullscreen else R.string.toast_switched_touchpad))
-        }
-    }
-
-    /** 工具条长按鼠标键：在全屏滑动与小触控板之间切换，并记住选择 */
-    private fun toggleMouseProfile() {
-        fullScreenDrag = !fullScreenDrag
-        KeyStore.saveFullScreenMouse(context, fullScreenDrag)
-        if (mouseOn) {
-            removeDragLayer()
-            if (fullScreenDrag) buildFullScreenLayer() else buildDragLayer()
-            raiseOverlayAboveLayer()
-        }
-        toast(getString(if (fullScreenDrag) R.string.toast_switched_fullscreen else R.string.toast_switched_touchpad))
-    }
-
+    /**
+     * 光标改成"整屏一层不接收触摸的透明窗 + 层内平移箭头"。
+     *
+     * 旧做法是 44dp 的小窗口，每来一条触摸采样就 wm.updateViewLayout 挪一次窗口。
+     * 挪窗口要走一次 relayout（IPC + WindowManager/合成事务），Android 12/13 上一次就要
+     * 十几毫秒，跟不上 120Hz 的采样，箭头就一格一格地跳 —— 用户看到的"一顿一顿"。
+     * 现在只改 View 的绘制位置，不碰窗口，箭头和注入位置才能真正做到逐帧跟随。
+     */
     private fun buildCursor() {
         removeCursor()
-        val size = dp(44)
         val stored = KeyStore.loadCursor(context)
+        mouseX = (stored.x * screenW).coerceIn(0f, (screenW - 1).toFloat())
+        mouseY = (stored.y * screenH).coerceIn(0f, (screenH - 1).toFloat())
         val p = windowParams().apply {
-            width = size
-            height = size
-            // 光标本身不接收触摸，避免挡住注入的鼠标事件
-            flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            x = (stored.x * screenW - dp(4)).roundToInt()
-                .coerceIn(0, max(0, screenW - size))
-            y = (stored.y * screenH - dp(4)).roundToInt()
-                .coerceIn(0, max(0, screenH - size))
+            width = screenW
+            height = screenH
+            // 整屏一层，但永远不接收触摸：不然注入的鼠标事件会被自己这一层接走
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            x = 0
+            y = 0
         }
         val cursor = MouseCursorView(themeCtx)
         runCatching { wm.addView(cursor, p) }
         cursorView = cursor
+        cursorArrow = cursor
         cursorParams = p
-        syncMousePosition(p)
-        // 布局完成后再取一次真实屏幕位置，修正状态栏/导航栏造成的偏移
+        cursorOffX = 0
+        cursorOffY = 0
+        updateCursorView()
+        wireMouseEngine()
+        // 布局完成后再校准一次（状态栏/挖孔可能让窗口原点不在 (0,0)）
         cursor.post {
             updateCursorOffsets()
-            val tx = mouseX
-            val ty = mouseY
-            worker.execute { ShizukuInjector.mouseMove(tx, ty) }
+            updateCursorView()
+            MouseEngine.invalidatePosition()
+        }
+        // 屏幕刷新率决定注入节拍（120Hz → 8ms，60Hz → 16ms）
+        runCatching {
+            @Suppress("DEPRECATION")
+            val hz = wm.defaultDisplay.refreshRate
+            if (hz > 0f) MouseEngine.setRefreshRate(hz)
         }
     }
 
-    /** 用 getLocationOnScreen 校准光标尖端的真实屏幕坐标 */
+    /** 把节拍线程的发送动作接到注入器上 */
+    private fun wireMouseEngine() {
+        MouseEngine.sendPaced = { x, y ->
+            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            else ShizukuInjector.mouseMove(x, y)
+        }
+        // 同步注入被系统拖住时，节拍线程会自己降级成这条（返回即走，不堵 UI）
+        MouseEngine.sendAsync = { x, y ->
+            if (mouseLeftHeld) ShizukuInjector.mouseDrag(x, y)
+            else ShizukuInjector.mouseMove(x, y)
+        }
+        MouseEngine.sendSync = { x, y ->
+            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            else ShizukuInjector.mouseMoveSync(x, y)
+        }
+        MouseEngine.setTarget(mouseX, mouseY)
+        MouseEngine.invalidatePosition()
+        MouseEngine.start()
+    }
+
+    /** 用 getLocationOnScreen 校准光标层的原点偏移 */
     private fun updateCursorOffsets() {
         val v = cursorView ?: return
         val p = cursorParams ?: return
@@ -3106,7 +3220,6 @@ class KeypadOverlay(private val context: Context) {
         v.getLocationOnScreen(loc)
         cursorOffX = loc[0] - p.x
         cursorOffY = loc[1] - p.y
-        syncMousePosition(p)
     }
 
     // ==================== 触控板拖动（支持从按键窗口转交手指） ====================
@@ -3117,7 +3230,109 @@ class KeypadOverlay(private val context: Context) {
         padDragMoved = false
         padDragLastX = x
         padDragLastY = y
+        padEvdevId = -1
+        padArmed = padUseEvdev
+        dragWinMoves = 0
+        padEvdevMoves = 0
+        // 旁听的按下事件几乎总是比窗口的 ACTION_DOWN 先到几十毫秒，
+        // 已经记在 padFinger* 里，这里直接认领，省掉「等下一帧才动」的空档
+        val now = SystemClock.uptimeMillis()
+        if (padArmed && padFingerId != -1 && now - padFingerAt < 350L &&
+            hypot(padFingerX - x, padFingerY - y) < dp(70)
+        ) {
+            bindPadFinger(padFingerId, padFingerX, padFingerY)
+        } else if (padArmed) {
+            padArmAt = now
+            padArmX = x
+            padArmY = y
+        }
         return true
+    }
+
+    /** 屏幕坐标是否落在触控板矩形里（旁听线程专用，只读缓存） */
+    private fun padRectContains(x: Float, y: Float): Boolean {
+        val l = padRectL
+        val t = padRectT
+        val r = padRectR
+        val b = padRectB
+        return r > l && b > t && x >= l && x <= r && y >= t && y <= b
+    }
+
+    /** 把某根内置手指认给触控板，从 (x, y) 起算位移 */
+    private fun bindPadFinger(id: Int, x: Float, y: Float) {
+        padEvdevId = id
+        padEvdevLast.set(x, y)
+        padEvdevTravel = 0f
+        padEvdevLastAt = SystemClock.uptimeMillis()
+        padEvdevLostAt = 0L
+    }
+
+    /**
+     * 触控板位移：直接用旁听坐标。
+     *
+     * 返回 true 表示这颗手指归触控板，后面的按键热区逻辑别再去处理它。
+     */
+    private fun handlePadEvdev(action: Int, id: Int, x: Float, y: Float): Boolean {
+        if (action == EvdevTouch.DOWN) {
+            if (!padRectContains(x, y)) return false
+            padFingerId = id
+            padFingerX = x
+            padFingerY = y
+            padFingerAt = SystemClock.uptimeMillis()
+            val now = padFingerAt
+            if (padDragActive && padEvdevId == -1) {
+                // 拖动中途重新绑定：手指短暂的 tracking 抖动会让旁听多发一次 UP，
+                // 只要它很快又出现（位置还在触控板里），就接着用旁听喂位移
+                val near = hypot(x - padArmX, y - padArmY) < dp(90) ||
+                    (now - padArmAt < 400L && hypot(x - padArmX, y - padArmY) < dp(70))
+                if (near || now - padArmAt < 120L) {
+                    bindPadFinger(id, x, y)
+                }
+            }
+            // 落在触控板里的手指归触控板，别再拿它去命中热区按键
+            return true
+        }
+        if (action == EvdevTouch.MOVE) {
+            if (id != padEvdevId) {
+                // 手指停住 200ms 会被解绑，双指手势结束也会解绑。以前只有「重新按下」
+                // 才能绑回来，一次停顿就把整段拖动丢进每秒几条的窗口通道 —— 表现出来
+                // 就是「拖一拖突然卡死，得重启」。现在只要这颗手指落在板子里、又不在
+                // 双指手势里，就立刻重新认领（这一帧只对齐基准，不搬位移）。
+                if (padDragActive && !padTwoActive && mouseOn && padRectContains(x, y)) {
+                    bindPadFinger(id, x, y)
+                    return true
+                }
+                return false
+            }
+            padEvdevMoves++          // 绑定成功才计数：这条通道真的在喂位移吗
+            padEvdevLastAt = SystemClock.uptimeMillis()
+            padEvdevLostAt = 0L
+            val dx = x - padEvdevLast.x
+            val dy = y - padEvdevLast.y
+            padEvdevLast.set(x, y)
+            if (abs(dx) < 0.01f && abs(dy) < 0.01f) return true
+            padEvdevTravel += hypot(dx, dy)
+            // 先走一小段才算拖动，手指刚落下时的抖动不算
+            if (!padDragMoved && padEvdevTravel > dp(4).toFloat()) padDragMoved = true
+            if (!padDragMoved) return true
+            val gain = mouseGain
+            synchronized(padLock) {
+                mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
+                mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
+            }
+            // 注入立刻跟上（这里是旁听线程，不受 UI 线程卡顿影响）
+            MouseEngine.setTarget(mouseX, mouseY)
+            // 箭头画的这一步合并到 UI 线程，最多 8ms 一次
+            requestCursorFrame()
+            return true
+        }
+        if (action == EvdevTouch.UP && id == padEvdevId) {
+            // 不立刻松绑：先给 200ms 宽限，手指要是又回来（见 DOWN 分支）就接着用旁听
+            padEvdevLostAt = SystemClock.uptimeMillis()
+            padEvdevLastAt = 0L
+            return true
+        }
+        return false
     }
 
     private fun movePadDrag(x: Float, y: Float) {
@@ -3131,24 +3346,38 @@ class KeypadOverlay(private val context: Context) {
         val gain = mouseGain
         mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
         mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
-        moveCursorWindowToMouse()
-        val now = SystemClock.uptimeMillis()
-        if (now - padDragLastInject >= 16L) {
-            padDragLastInject = now
-            injectHoverAtCursor()
-        }
+        onMouseMoved()
     }
 
     /** 手指离开触控板：没拖动过就当作一次左键单击（tap=false 时只保存位置） */
     private fun endPadDrag(tap: Boolean = true) {
         if (!padDragActive) return
         padDragActive = false
+        padEvdevId = -1
+        padArmed = false
+        // 只有旁听整段一次都没喂到（Shizuku 断了 / getevent 起不来 / 设备节点不对）才退回窗口通道；
+        // 旁听只要拿到了数据就继续用它——窗口通道在 12/13 上被压到每秒几条，本身就是卡顿的根源
+        padUseEvdev = padEvdevMoves > 0
+        Log.i(
+            "KeypadPad",
+            "drag: win=$dragWinMoves evdev=$padEvdevMoves useEvdev=$padUseEvdev " +
+                "gain=$mouseGain cost=${"%.1f".format(MouseEngine.avgCostMs)}ms " +
+                "sends=${MouseEngine.sends} rejects=${MouseEngine.rejects}"
+        )
+        // 自愈：这一整段旁听一条位移都没喂到，说明 getevent 那条管线死了
+        //（被系统冻结、被杀、或设备节点换了，常见于切到别的应用之后）。
+        // 每段拖动结束立刻重启一次，下一段就不用再吃每秒几条的窗口通道。
+        if (mouseOn && padEvdevMoves == 0) {
+            Log.i("KeypadPad", "evdev gave nothing this drag -> restart listener")
+            EvdevTouch.stop()
+            refreshEvdev()
+        }
         if (!tap) {
             KeyStore.saveCursor(context, mouseX / screenW.toFloat(), mouseY / screenH.toFloat())
             return
         }
         if (padDragMoved) {
-            injectHoverAtCursor()
+            flushHover()
         } else if (mouseLeftHeld) {
             // 左键锁定状态下，轻点触控板 = 松开左键
             setMouseLeftHeld(false)
@@ -3156,7 +3385,7 @@ class KeypadOverlay(private val context: Context) {
             val tx = mouseX
             val ty = mouseY
             withOverlayUntouchable {
-                ShizukuInjector.mouseClick(MotionEvent.BUTTON_PRIMARY, tx, ty)
+                ShizukuInjector.mouseClick(MotionEvent.BUTTON_PRIMARY, tx, ty, touchFallback = true)
             }
         }
         KeyStore.saveCursor(context, mouseX / screenW.toFloat(), mouseY / screenH.toFloat())
@@ -3249,6 +3478,7 @@ class KeypadOverlay(private val context: Context) {
         var activeId = -1
         var longFired = false
         var consumedTap = false
+        var pendingRightTap = false
         var twoActive = false
         var twoMoved = false
         var twoStartTime = 0L
@@ -3285,11 +3515,17 @@ class KeypadOverlay(private val context: Context) {
             body.getLocationOnScreen(bodyLoc)
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    // 给旁听线程缓存一份板子矩形（它不能调 View.getLocationOnScreen）
+                    padRectL = bodyLoc[0]
+                    padRectT = bodyLoc[1] - dp(26)
+                    padRectR = bodyLoc[0] + body.width
+                    padRectB = bodyLoc[1] + body.height
                     val id = ev.getPointerId(0)
                     longFired = false
                     consumedTap = false
                     twoActive = false
                     twoMoved = false
+                    pendingRightTap = false
                     scrollAcc = 0f
                     activeId = if (beginPadDrag(ev.getX(0) + bodyLoc[0], ev.getY(0) + bodyLoc[1])) id else -1
                     if (activeId != -1) body.postDelayed(longPress, 450)
@@ -3315,6 +3551,10 @@ class KeypadOverlay(private val context: Context) {
                     if (padContains(sx, sy)) {
                         // 第二根手指也落在触控板上：进入双指手势（右键 / 滚轮）
                         twoActive = true
+                        padTwoActive = true
+                        // 双指手势期间停掉旁听驱动，否则滚动时第二根手指会把光标一起拖走
+                        padEvdevId = -1
+                        padArmed = false
                         twoMoved = false
                         twoStartTime = SystemClock.uptimeMillis()
                         twoLastY = twoFingerY(ev)
@@ -3344,7 +3584,17 @@ class KeypadOverlay(private val context: Context) {
                     } else {
                         val idx = ev.findPointerIndex(activeId)
                         if (idx >= 0) {
-                            movePadDrag(ev.getX(idx) + bodyLoc[0], ev.getY(idx) + bodyLoc[1])
+                            dragWinMoves++
+                            // 旁听断流超过 200ms（tracking 抖动 / getevent 卡住）就退回窗口通道，
+                            // 宁可粗糙也别让光标停在原地
+                            if (padEvdevId != -1) {
+                                val ref = if (padEvdevLastAt > 0) padEvdevLastAt else padEvdevLostAt
+                                if (ref > 0 && SystemClock.uptimeMillis() - ref > 200L) padEvdevId = -1
+                            }
+                            // 旁听在喂时不重复搬位移，否则两边一起算会翻倍
+                            if (padEvdevId == -1) {
+                                movePadDrag(ev.getX(idx) + bodyLoc[0], ev.getY(idx) + bodyLoc[1])
+                            }
                         }
                     }
                     for (i in 0 until ev.pointerCount) {
@@ -3360,14 +3610,13 @@ class KeypadOverlay(private val context: Context) {
                     val id = ev.getPointerId(ev.actionIndex)
                     if (twoActive) {
                         twoActive = false
+                        padTwoActive = false
                         consumedTap = true
+                        // 双指轻点 = 右键。这里只记一笔，等手指全抬起来再注入：
+                        // 按着手指的时候注入鼠标按键，安卓 12/13 的 InputDispatcher
+                        // 常会判它「没有落点窗口」直接失败，就是那个反复闪的报错
                         if (!twoMoved && SystemClock.uptimeMillis() - twoStartTime < 400L) {
-                            // 双指轻点 = 右键
-                            val tx = mouseX
-                            val ty = mouseY
-                            withOverlayUntouchable {
-                                ShizukuInjector.mouseClick(MotionEvent.BUTTON_SECONDARY, tx, ty)
-                            }
+                            pendingRightTap = true
                         }
                     }
                     if (id == activeId) {
@@ -3384,7 +3633,18 @@ class KeypadOverlay(private val context: Context) {
                         activeId = -1
                     }
                     twoActive = false
+                    padTwoActive = false
                     releasePadPointer(pointerToken(body, ev.getPointerId(0)), padKeyTargets)
+                    if (pendingRightTap) {
+                        pendingRightTap = false
+                        val tx = mouseX
+                        val ty = mouseY
+                        withOverlayUntouchable {
+                            ShizukuInjector.mouseClick(
+                                MotionEvent.BUTTON_SECONDARY, tx, ty, touchFallback = true
+                            )
+                        }
+                    }
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -3392,6 +3652,7 @@ class KeypadOverlay(private val context: Context) {
                     cancelPadDrag()
                     activeId = -1
                     twoActive = false
+                    padTwoActive = false
                     padKeyTargets.keys.toList().forEach { t -> releasePadPointer(t, padKeyTargets) }
                     val prefix = System.identityHashCode(body).toString() + ":"
                     val it = forwardTokens.iterator()
@@ -3412,224 +3673,21 @@ class KeypadOverlay(private val context: Context) {
         dragParams = p
     }
 
+
     /**
-     * 全屏拖动模式：整块屏幕都能拖动光标。
-     *
-     * 这一层完全透明但会接管全部触摸（游戏自身的触摸会被挡住），
-     * 且拖动过程中不能注入悬停事件——注入的悬停会被这一层自己接住，
-     * 所以拖动时只移动看得见的箭头，松手时再把最终位置同步给游戏。
+     * 拖动过程中只需要把最新位置交给节拍线程，帧率/丢帧由它统一处理。
+     * （旧实现是每条采样丢到串行线程、忙就丢帧，低版本上就是"一顿一顿"）
      */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun buildFullScreenLayer() {
-        removeDragLayer()
-        // 热区模式下不再铺全屏触摸层：滑动改由旁听的原始坐标驱动，
-        // 否则这一层会把所有手指都吃掉，热区按键全都失效。
-        if (hotMode) return
-        val layer = View(themeCtx).apply {
-            setBackgroundColor(0x01101010)
-            isClickable = true
-        }
-        val p = windowParams().apply {
-            width = screenW
-            height = screenH
-            x = 0
-            y = 0
-        }
-        var lastX = 0f
-        var lastY = 0f
-        var moved = false
-        var activeId = -1
-        var consumedTap = false
-        var twoActive = false
-        var twoMoved = false
-        var twoStartTime = 0L
-        var twoLastY = 0f
-        var twoNetY = 0f
-        var twoTotal = 0f
-        var pendingTwo = false
-        var pendingTwoTap = false
-        var pendingTicks = 0
-        var pendingDir = 1f
-        val layerKeyTargets = HashMap<String, KeyItem>()
-        val layerLoc = IntArray(2)
-
-        // 只统计落在这一层上的手指（按在按键上的不算），返回平均 Y
-        fun layerAvgY(e: MotionEvent): Float {
-            var sum = 0f
-            var n = 0
-            for (i in 0 until e.pointerCount) {
-                if (pointerToken(layer, e.getPointerId(i)) !in layerKeyTargets) {
-                    sum += e.getY(i)
-                    n++
-                }
-            }
-            return if (n >= 2) sum / n else Float.MIN_VALUE
-        }
-
-        layer.setOnTouchListener { _, ev ->
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    activeId = ev.getPointerId(0)
-                    layer.getLocationOnScreen(layerLoc)
-                    lastX = ev.getX(0) + layerLoc[0]
-                    lastY = ev.getY(0) + layerLoc[1]
-                    moved = false
-                    consumedTap = false
-                    twoActive = false
-                    twoMoved = false
-                    true
-                }
-                MotionEvent.ACTION_POINTER_DOWN -> {
-                    val idx = ev.actionIndex
-                    val id = ev.getPointerId(idx)
-                    val sx = ev.getX(idx) + layerLoc[0]
-                    val sy = ev.getY(idx) + layerLoc[1]
-                    val target = keyAtScreen(layer, sx, sy)?.takeIf { it.type != KeyType.JOYSTICK }
-                    if (target != null) {
-                        // 第二根手指落在按键上：无论系统是否分流，这里都按下去
-                        val token = pointerToken(layer, id)
-                        layerKeyTargets[token] = target
-                        pointerTargets[token] = target
-                        pressKey(target)
-                    } else {
-                        // 两根手指都在拖动层上：进入双指手势（右键 / 滚轮）
-                        twoActive = true
-                        twoMoved = false
-                        twoStartTime = SystemClock.uptimeMillis()
-                        twoLastY = layerAvgY(ev)
-                        twoNetY = 0f
-                        twoTotal = 0f
-                    }
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (twoActive) {
-                        val avgY = layerAvgY(ev)
-                        if (avgY != Float.MIN_VALUE) {
-                            val dy = avgY - twoLastY
-                            twoLastY = avgY
-                            twoNetY += dy
-                            twoTotal += abs(dy)
-                            if (twoTotal > dp(6)) twoMoved = true
-                        }
-                    } else {
-                        val idx = ev.findPointerIndex(activeId)
-                        if (idx < 0) return@setOnTouchListener true
-                        val sx = ev.getX(idx) + layerLoc[0]
-                        val sy = ev.getY(idx) + layerLoc[1]
-                        val dx = sx - lastX
-                        val dy = sy - lastY
-                        lastX = sx
-                        lastY = sy
-                        if (abs(dx) + abs(dy) > 1f) moved = true
-                        if (moved) {
-                            val gain = mouseGain
-                            mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
-                            mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
-                            moveCursorWindowToMouse()
-                        }
-                    }
-                    true
-                }
-                MotionEvent.ACTION_POINTER_UP -> {
-                    val id = ev.getPointerId(ev.actionIndex)
-                    layerKeyTargets.remove(pointerToken(layer, id))?.let { k ->
-                        releaseKey(k)
-                        pointerTargets.remove(pointerToken(layer, id))
-                    }
-                    if (twoActive) {
-                        twoActive = false
-                        consumedTap = true
-                        // 还有一根手指按在层上，现在动窗口会打断手势，等手指全抬起再注入
-                        pendingTwo = true
-                        pendingTwoTap = !twoMoved && SystemClock.uptimeMillis() - twoStartTime < 400L
-                        pendingTicks = if (twoMoved) {
-                            (abs(twoNetY) / dp(22)).toInt().coerceIn(1, 10)
-                        } else 0
-                        pendingDir = if (twoNetY < 0) -1f else 1f
-                    }
-                    if (id == activeId) {
-                        activeId = -1
-                    } else if (activeId != -1) {
-                        // 双指手势结束，剩下那根手指从当前位置继续拖，避免跳一下
-                        val ai = ev.findPointerIndex(activeId)
-                        if (ai >= 0) {
-                            lastX = ev.getX(ai) + layerLoc[0]
-                            lastY = ev.getY(ai) + layerLoc[1]
-                        }
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (activeId != -1 && !consumedTap && !pendingTwo) {
-                        val tx = mouseX
-                        val ty = mouseY
-                        // 手指已离开，此时临时让开这一层不会打断手势
-                        if (moved) {
-                            injectInFullScreen { ShizukuInjector.mouseMove(tx, ty) }
-                        } else {
-                            injectInFullScreen {
-                                ShizukuInjector.mouseClick(MotionEvent.BUTTON_PRIMARY, tx, ty)
-                            }
-                        }
-                    }
-                    if (pendingTwo) {
-                        pendingTwo = false
-                        val tx = mouseX
-                        val ty = mouseY
-                        if (pendingTwoTap) {
-                            injectInFullScreen {
-                                ShizukuInjector.mouseClick(MotionEvent.BUTTON_SECONDARY, tx, ty)
-                            }
-                        } else if (pendingTicks > 0) {
-                            injectInFullScreen {
-                                repeat(pendingTicks) {
-                                    ShizukuInjector.mouseWheel(tx, ty, pendingDir)
-                                }
-                                true
-                            }
-                        }
-                    }
-                    layerKeyTargets.remove(pointerToken(layer, ev.getPointerId(0)))?.let { k ->
-                        releaseKey(k)
-                        pointerTargets.remove(pointerToken(layer, ev.getPointerId(0)))
-                    }
-                    KeyStore.saveCursor(context, mouseX / screenW.toFloat(), mouseY / screenH.toFloat())
-                    activeId = -1
-                    twoActive = false
-                    true
-                }
-                MotionEvent.ACTION_CANCEL -> {
-                    activeId = -1
-                    twoActive = false
-                    pendingTwo = false
-                    layerKeyTargets.keys.toList().forEach { t ->
-                        layerKeyTargets.remove(t)?.let { k ->
-                            releaseKey(k)
-                            pointerTargets.remove(t)
-                        }
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-        runCatching { wm.addView(layer, p) }
-        dragLayer = layer
-        dragParams = p
+    private fun injectHoverAtCursor() {
+        MouseEngine.setTarget(mouseX, mouseY)
     }
 
-    /** 触控板拖动时持续把鼠标位置注入给游戏（上一帧没注入完就丢掉这一帧） */
-    private fun injectHoverAtCursor() {
-        if (hoverBusy) return
-        hoverBusy = true
+    /** 松手/定格：最后一帧用同步注入送达，避免最终位置丢在队列里 */
+    private fun flushHover() {
         val tx = mouseX
         val ty = mouseY
-        hoverWorker.execute {
-            if (mouseLeftHeld) ShizukuInjector.mouseDrag(tx, ty)
-            else ShizukuInjector.mouseMove(tx, ty)
-            hoverBusy = false
-        }
+        MouseEngine.setTarget(tx, ty)
+        worker.execute { MouseEngine.flush(tx, ty) }
     }
 
     /** 触摸层在最上面，会把按键、工具条和光标挡住，重新添加一遍抬到最前 */
@@ -3677,38 +3735,57 @@ class KeypadOverlay(private val context: Context) {
         dragParams = null
     }
 
-    /** 让箭头跟着虚拟鼠标走 */
-    private fun moveCursorWindowToMouse() {
-        val v = cursorView ?: return
-        val p = cursorParams ?: return
-        val size = dp(44)
-        p.x = (mouseX - cursorOffX - dp(4)).roundToInt().coerceIn(0, max(0, screenW - size))
-        p.y = (mouseY - cursorOffY - dp(4)).roundToInt().coerceIn(0, max(0, screenH - size))
-        runCatching { wm.updateViewLayout(v, p) }
-    }
-
-    /** 光标窗口左上角 -> 箭头尖端的屏幕坐标 */
-    private fun syncMousePosition(p: WindowManager.LayoutParams) {
-        mouseX = (p.x + cursorOffX + dp(4)).toFloat().coerceIn(0f, (screenW - 1).toFloat())
-        mouseY = (p.y + cursorOffY + dp(4)).toFloat().coerceIn(0f, (screenH - 1).toFloat())
-    }
-
     private fun removeCursor() {
+        MouseEngine.stop()
         cursorView?.let { runCatching { wm.removeViewImmediate(it) } }
         cursorView = null
+        cursorArrow = null
         cursorParams = null
         cursorOffX = 0
         cursorOffY = 0
     }
 
+    /** 屏幕尺寸/旋转变化后重新贴一次光标层（整屏窗口，只需要重新提交参数） */
     private fun placeCursor() {
         val p = cursorParams ?: return
         val v = cursorView ?: return
-        val size = dp(44)
-        p.x = p.x.coerceIn(0, max(0, screenW - size))
-        p.y = p.y.coerceIn(0, max(0, screenH - size))
+        p.width = screenW
+        p.height = screenH
+        p.x = 0
+        p.y = 0
         runCatching { wm.updateViewLayout(v, p) }
-        v.post { updateCursorOffsets() }
+        v.post {
+            updateCursorOffsets()
+            updateCursorView()
+        }
+    }
+
+    /**
+     * 让箭头跟着虚拟鼠标走。
+     *
+     * 只改 View 的绘制位置（走 invalidate），不动窗口：低版本挪窗口太慢，
+     * 每帧挪一次窗口正是光标抖动/一顿一顿的来源。
+     */
+    private fun updateCursorView() {
+        cursorArrow?.moveTo(mouseX - cursorOffX, mouseY - cursorOffY)
+    }
+
+    /** 鼠标位置变了之后统一走这里：箭头立刻跟手，注入交给节拍线程 */
+    private fun onMouseMoved() {
+        updateCursorView()
+        MouseEngine.setTarget(mouseX, mouseY)
+    }
+
+    /** 光标重绘合并节流：只在 UI 线程重画箭头，注入早就发出去了 */
+    private var cursorFramePosted = false
+
+    private fun requestCursorFrame() {
+        if (cursorFramePosted) return
+        cursorFramePosted = true
+        ui.postDelayed({
+            cursorFramePosted = false
+            updateCursorView()
+        }, 8L)
     }
 
     /** 鼠标箭头光标：白色箭头 + 黑色描边，尖端就是注入点 */
@@ -3725,7 +3802,38 @@ class KeypadOverlay(private val context: Context) {
         }
         private val path = Path()
 
+        // 箭头尖端在当前这一层里的绘制位置
+        private var tipX = 0f
+        private var tipY = 0f
+
+        /** 本层实际重绘的帧数，触控板上的诊断数字要用 */
+        @Volatile
+        var frames: Long = 0L
+            private set
+
+        /** 把箭头尖端移到 (x, y)（层坐标系，已扣掉窗口原点偏移） */
+        @Suppress("DEPRECATION")
+        fun moveTo(x: Float, y: Float) {
+            if (abs(x - tipX) < 0.01f && abs(y - tipY) < 0.01f) return
+            val oldL = tipX - arrowExtent
+            val oldT = tipY - arrowExtent
+            val oldR = tipX + arrowExtent
+            val oldB = tipY + arrowExtent
+            tipX = x
+            tipY = y
+            // 只把箭头的旧框 + 新框标脏：整屏重绘在低端机上光栅化就很重，
+            // 每帧刷满一整屏会让光标和整个画面一起卡
+            val l = min(oldL, x - arrowExtent)
+            val t = min(oldT, y - arrowExtent)
+            val r = max(oldR, x + arrowExtent)
+            val b = max(oldB, y + arrowExtent)
+            invalidate(l.toInt(), t.toInt(), r.toInt(), b.toInt())
+        }
+
+        private val arrowExtent = dp(40)
+
         override fun onDraw(canvas: Canvas) {
+            frames++
             val s = dp(44).toFloat() / 64f
             path.reset()
             path.moveTo(4 * s, 4 * s)
@@ -3736,8 +3844,12 @@ class KeypadOverlay(private val context: Context) {
             path.lineTo(20 * s, 27 * s)
             path.lineTo(33 * s, 27 * s)
             path.close()
+            // 箭头几何是按 (4s, 4s) 为尖端画的，整体平移让尖端正好落在鼠标位置
+            canvas.save()
+            canvas.translate(tipX - 4 * s, tipY - 4 * s)
             canvas.drawPath(path, fill)
             canvas.drawPath(path, stroke)
+            canvas.restore()
         }
     }
 }

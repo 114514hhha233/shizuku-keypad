@@ -8,6 +8,7 @@ import android.view.InputEvent
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.util.Log
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
@@ -25,7 +26,16 @@ import java.lang.reflect.Method
  */
 object ShizukuInjector {
 
+    /**
+     * IInputManager.injectInputEvent 的三个模式：
+     *   ASYNC(0)              —— 入队就返回，不等待系统分发，鼠标悬停这类高频事件用它，
+     *                            低版本单次注入十几毫秒也不会把节拍线程堵住。
+     *   WAIT_FOR_FINISH(1)    —— 等到目标应用处理完，能拿到真实结果（按键/按下抬起用）。
+     *   WAIT_FOR_RESULT(2)    —— 等到事件分发出去，不等到消费（"先悬停再按键"的定序用）。
+     */
+    private const val MODE_ASYNC = 0
     private const val MODE_WAIT_FOR_FINISH = 1
+    private const val MODE_WAIT_FOR_RESULT = 2
     private const val TAG = "ShizukuInjector"
 
     private var inputManager: Any? = null
@@ -60,6 +70,8 @@ object ShizukuInjector {
         activePointers.clear()
         gestureDownTime = 0L
         nextPointerId = 0
+        hoverActive = false
+        lastMouseDiag = ""
         ready = false
         lastErrorRes = 0
         lastErrorArgs = emptyList()
@@ -107,11 +119,19 @@ object ShizukuInjector {
         }
     }
 
-    private fun inject(event: InputEvent): Boolean {
+    private fun inject(event: InputEvent): Boolean = injectMode(event, MODE_WAIT_FOR_FINISH)
+
+    /** 异步注入：只保证事件进了系统队列，返回 false 表示连队列都没进去 */
+    private fun injectAsync(event: InputEvent): Boolean = injectMode(event, MODE_ASYNC)
+
+    /** 只等「已分发」：不等应用消费完，既有系统回执又不会被忙的应用拖成假失败 */
+    private fun injectResult(event: InputEvent): Boolean = injectMode(event, MODE_WAIT_FOR_RESULT)
+
+    private fun injectMode(event: InputEvent, mode: Int): Boolean {
         if (!ensureReady()) return false
         return try {
-            val accepted = injectMethod!!.invoke(inputManager, event, MODE_WAIT_FOR_FINISH) as? Boolean ?: false
-            if (!accepted) setError(R.string.injector_rejected)
+            val accepted = injectMethod!!.invoke(inputManager, event, mode) as? Boolean ?: false
+            if (!accepted && mode != MODE_ASYNC) setError(R.string.injector_rejected)
             accepted
         } catch (t: Throwable) {
             val cause = (t as? InvocationTargetException)?.targetException ?: t
@@ -297,6 +317,25 @@ object ShizukuInjector {
 
     private var mouseDownTime = 0L
 
+
+    /** 指针是否已经在系统里"悬停"过（低版本没有这层状态时按键事件会被直接丢掉） */
+    private var hoverActive = false
+
+    /** 最近一次鼠标注入的过程记录：失败时拼进提示，方便在低版本机型上一眼定位 */
+    @Volatile
+    var lastMouseDiag: String = ""
+        private set
+
+    private fun diag(text: String) {
+        lastMouseDiag = text
+        Log.i(TAG, "mouse: $text")
+    }
+
+    /**
+     * 悬停事件用 downTime = 0、pressure = 0 —— 这是真实鼠标悬停事件的样子。
+     * 早先按"按下"的写法造悬停事件，Android 12/13 的 InputDispatcher 会认为
+     * 事件状态自相矛盾，直接丢弃，表现就是光标不动或移动一顿一顿。
+     */
     private fun mouseEvent(
         action: Int,
         x: Float,
@@ -304,7 +343,9 @@ object ShizukuInjector {
         buttonState: Int,
         downTime: Long,
         eventTime: Long,
-        vScroll: Float = 0f
+        vScroll: Float = 0f,
+        hover: Boolean = false,
+        actionButton: Int = 0
     ): MotionEvent {
         val props = MotionEvent.PointerProperties().apply {
             id = 0
@@ -313,66 +354,278 @@ object ShizukuInjector {
         val coords = MotionEvent.PointerCoords().apply {
             this.x = x
             this.y = y
-            pressure = 1f
-            size = 1f
+            pressure = if (hover) 0f else 1f
+            size = if (hover) 0f else 1f
             if (vScroll != 0f) setAxisValue(MotionEvent.AXIS_VSCROLL, vScroll)
         }
-        return MotionEvent.obtain(
-            downTime, eventTime, action, 1,
+        val ev = MotionEvent.obtain(
+            if (hover) 0L else downTime, eventTime, action, 1,
             arrayOf(props), arrayOf(coords),
             0, buttonState, 1f, 1f, 0, 0,
             InputDevice.SOURCE_MOUSE, 0
         )
+        // 只有 buttonState 不够：串流/游戏/桌面类应用多数用 getActionButton()
+        // 判断"哪个键按下去 / 哪个键松开"。这个字段只能反射补（注入在 shell 进程里跑，
+        // 不受应用层隐藏 API 限制）；补不上就算了，不影响本来能用的场景。
+        if (!hover && actionButton != 0) {
+            runCatching {
+                val f = MotionEvent::class.java.getDeclaredField("mActionButton")
+                f.isAccessible = true
+                f.setInt(ev, actionButton)
+            }
+        }
+        return ev
     }
 
-    /** 真实鼠标按键：button 取 MotionEvent.BUTTON_PRIMARY / SECONDARY / TERTIARY */
+    /**
+     * 按下/滚动鼠标键之前，先把指针"摆"到目标位置。
+     *
+     * 真鼠标的按键事件前面必然跟着一串悬停事件；而 12/13 的 InputDispatcher
+     * 在缺少"指针已在该窗口悬停"这层状态时，按键事件会因为找不到落点窗口
+     * 被判定为注入失败（injectInputEvent 返回 false）—— 这正是"左右键注入失败"。
+     * 用 WAIT_FOR_RESULT 是为了拿到"已分发"的回执，保证按键事件排它后面。
+     */
     @Synchronized
-    fun mouseClick(button: Int, x: Float, y: Float): Boolean {
-        val downTime = SystemClock.uptimeMillis()
-        var ok = inject(mouseEvent(MotionEvent.ACTION_DOWN, x, y, button, downTime, downTime))
-        SystemClock.sleep(30)
-        ok = inject(
-            mouseEvent(MotionEvent.ACTION_UP, x, y, 0, downTime, SystemClock.uptimeMillis())
-        ) && ok
-        return ok
+    private fun hoverFirst(x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
+        if (!hoverActive) {
+            // 第一次：ENTER 与 MOVE 都等「已分发」。低版本上 ENTER 还在队列里就发按键，
+            // InputDispatcher 那边「指针已悬停」的状态是空的，按键会被判失败
+            injectMode(
+                mouseEvent(MotionEvent.ACTION_HOVER_ENTER, x, y, 0, 0L, now, hover = true),
+                MODE_WAIT_FOR_RESULT
+            )
+            hoverActive = true
+            injectMode(
+                mouseEvent(MotionEvent.ACTION_HOVER_MOVE, x, y, 0, 0L, now, hover = true),
+                MODE_WAIT_FOR_RESULT
+            )
+        } else {
+            // 指针已经在悬停状态里了，这一发只为把落点对齐，不必再等回执（省 10ms 的点击延迟）
+            injectAsync(
+                mouseEvent(MotionEvent.ACTION_HOVER_MOVE, x, y, 0, 0L, now, hover = true)
+            )
+            SystemClock.sleep(3)
+        }
     }
 
-    /** 按住鼠标键（拖拽锁定用），配合 [mouseButtonUp] */
+    /** 悬停移动（异步）：拖动时由 MouseEngine 按固定节拍调用，不阻塞、不丢帧 */
+    @Synchronized
+    fun mouseMove(x: Float, y: Float): Boolean {
+        val now = SystemClock.uptimeMillis()
+        hoverActive = true
+        return injectAsync(
+            mouseEvent(MotionEvent.ACTION_HOVER_MOVE, x, y, 0, 0L, now, hover = true)
+        )
+    }
+
+
+    /** 同步悬停移动：松手定格用，等系统分发完再返回，保证最终位置一定落地 */
+    @Synchronized
+    fun mouseMoveSync(x: Float, y: Float): Boolean {
+        val now = SystemClock.uptimeMillis()
+        hoverActive = true
+        return injectMode(
+            mouseEvent(MotionEvent.ACTION_HOVER_MOVE, x, y, 0, 0L, now, hover = true),
+            MODE_WAIT_FOR_RESULT
+        )
+    }
+
+    /** 一次完整点击：悬停对齐 → 按下 → 90ms → 抬起（再补一发抬起兜底） */
+    @Synchronized
+    fun mouseClick(button: Int, x: Float, y: Float, touchFallback: Boolean = true): Boolean {
+        val t0 = SystemClock.uptimeMillis()
+        val name = when (button) {
+            MotionEvent.BUTTON_PRIMARY -> "左键"
+            MotionEvent.BUTTON_SECONDARY -> "右键"
+            else -> "中键"
+        }
+        // 先把上一轮可能卡住的"按下"清掉：没有按下配对的抬起系统直接丢，不会有副作用
+        runCatching {
+            injectResult(mouseEvent(MotionEvent.ACTION_UP, x, y, 0,
+                SystemClock.uptimeMillis(), SystemClock.uptimeMillis()))
+        }
+        hoverFirst(x, y)
+        val holdMs = if (button == MotionEvent.BUTTON_PRIMARY) 60L else 120L
+        val mouseOk = clickViaMouse(button, x, y, holdMs)  // 只看"按下"有没有被接受
+
+        // 串流类应用（Moonlight / RustDesk / ToDesk 等）会把指针独占捕获（requestPointerCapture），
+        // 有的还只收自己那套触摸手势，鼠标事件会被输入分发直接丢掉，注入返回 false ——
+        // 就是我们看到的"注入失败"提示。这种情况改发一次真正的触摸点按：
+        // 这类客户端本来就支持"点一下 = 左键单击"，右键同理，等于把键值送到了。
+        if (!mouseOk && touchFallback) {
+            val touchOk = clickViaTouch(x, y, holdMs)
+            diag("$name 鼠标注入被拒,改用触摸${if (touchOk) "ok" else "也失败"}")
+            return touchOk
+        }
+        diag("$name ${if (mouseOk) "ok" else "失败"} ${SystemClock.uptimeMillis() - t0}ms")
+        return mouseOk
+    }
+
+    /** 绝对坐标鼠标点击（正常应用走这条） */
+    private fun clickViaMouse(button: Int, x: Float, y: Float, holdMs: Long): Boolean {
+        val downTime = SystemClock.uptimeMillis()
+        val down = injectResult(
+            mouseEvent(MotionEvent.ACTION_DOWN, x, y, button, downTime, downTime,
+                actionButton = button)
+        )
+        var up = false
+        try {
+            // 左键 60ms（"点一下就是点一下"），右/中键 120ms（右键菜单需要按住一小会儿）
+            SystemClock.sleep(holdMs)
+            up = injectResult(
+                mouseEvent(MotionEvent.ACTION_UP, x, y, 0, downTime, SystemClock.uptimeMillis(),
+                    actionButton = button)
+            )
+            if (!up) {
+                SystemClock.sleep(40)
+                up = injectResult(
+                    mouseEvent(MotionEvent.ACTION_UP, x, y, 0, downTime, SystemClock.uptimeMillis(),
+                        actionButton = button)
+                )
+            }
+        } catch (t: Throwable) {
+            diag("抬起异常 ${t.javaClass.simpleName}")
+        } finally {
+            // 中途出什么事都要把抬起送出去：缺抬起 = 应用一直以为还按着
+            runCatching {
+                injectResult(mouseEvent(MotionEvent.ACTION_UP, x, y, 0, downTime,
+                    SystemClock.uptimeMillis(), actionButton = button))
+            }
+        }
+        return down
+    }
+
+    /** 触摸点按兜底：给只认触摸手势的串流客户端用 */
+    private fun clickViaTouch(x: Float, y: Float, holdMs: Long): Boolean {
+        val downTime = SystemClock.uptimeMillis()
+        val down = injectResult(touchEvent(MotionEvent.ACTION_DOWN, x, y, downTime, downTime))
+        var up = false
+        try {
+            SystemClock.sleep(holdMs)
+            up = injectResult(
+                touchEvent(MotionEvent.ACTION_UP, x, y, downTime, SystemClock.uptimeMillis())
+            )
+            if (!up) {
+                SystemClock.sleep(40)
+                up = injectResult(
+                    touchEvent(MotionEvent.ACTION_UP, x, y, downTime, SystemClock.uptimeMillis())
+                )
+            }
+        } finally {
+            runCatching {
+                injectResult(
+                    touchEvent(MotionEvent.ACTION_UP, x, y, downTime, SystemClock.uptimeMillis())
+                )
+            }
+        }
+        return down && up
+    }
+
+    private fun touchEvent(
+        action: Int,
+        x: Float,
+        y: Float,
+        downTime: Long,
+        eventTime: Long
+    ): MotionEvent {
+        val props = MotionEvent.PointerProperties().apply {
+            id = 0
+            toolType = MotionEvent.TOOL_TYPE_FINGER
+        }
+        val coords = MotionEvent.PointerCoords().apply {
+            this.x = x
+            this.y = y
+            pressure = 1f
+            size = 1f
+        }
+        return MotionEvent.obtain(
+            downTime, eventTime, action, 1,
+            arrayOf(props), arrayOf(coords),
+            0, 0, 1f, 1f, 0, 0,
+            InputDevice.SOURCE_TOUCHSCREEN, 0
+        )
+    }
+
+    /** 当前按住的是哪个键（抬起时 getActionButton 要用） */
+    private var heldButton = 0
+
     @Synchronized
     fun mouseButtonDown(button: Int, x: Float, y: Float): Boolean {
-        val now = SystemClock.uptimeMillis()
-        mouseDownTime = now
-        return inject(mouseEvent(MotionEvent.ACTION_DOWN, x, y, button, now, now))
+        hoverFirst(x, y)
+        heldButton = button
+        var ok = false
+        var tries = 0
+        while (tries < 2 && !ok) {
+            tries++
+            val now = SystemClock.uptimeMillis()
+            mouseDownTime = now
+            ok = injectResult(mouseEvent(MotionEvent.ACTION_DOWN, x, y, button, now, now,
+                actionButton = button))
+            if (!ok) {
+                SystemClock.sleep(50)
+                hoverFirst(x, y)
+            }
+        }
+        diag(if (ok) "左键按住 ok" else "左键按住 失败(${tries}次)")
+        return ok
     }
 
     @Synchronized
     fun mouseButtonUp(x: Float, y: Float): Boolean {
-        val now = SystemClock.uptimeMillis()
-        val down = if (mouseDownTime == 0L) now else mouseDownTime
-        mouseDownTime = 0L
-        return inject(mouseEvent(MotionEvent.ACTION_UP, x, y, 0, down, now))
+        var ok = false
+        var tries = 0
+        while (tries < 2 && !ok) {
+            tries++
+            val now = SystemClock.uptimeMillis()
+            val down = if (mouseDownTime == 0L) now else mouseDownTime
+            mouseDownTime = 0L
+            ok = injectResult(mouseEvent(MotionEvent.ACTION_UP, x, y, 0, down, now,
+                actionButton = heldButton))
+            if (!ok) SystemClock.sleep(40)
+        }
+        diag(if (ok) "左键松开 ok" else "左键松开 失败(${tries}次)")
+        heldButton = 0
+        return ok
     }
 
     /** 真实鼠标滚轮：vertical > 0 向上，< 0 向下 */
     @Synchronized
     fun mouseWheel(x: Float, y: Float, vertical: Float): Boolean {
-        val now = SystemClock.uptimeMillis()
-        return inject(mouseEvent(MotionEvent.ACTION_SCROLL, x, y, 0, now, now, vertical))
+        hoverFirst(x, y)
+        var ok = false
+        var tries = 0
+        while (tries < 2 && !ok) {
+            tries++
+            val now = SystemClock.uptimeMillis()
+            ok = injectResult(mouseEvent(MotionEvent.ACTION_SCROLL, x, y, 0, now, now, vertical))
+            if (!ok) {
+                SystemClock.sleep(40)
+                hoverFirst(x, y)
+            }
+        }
+        diag(if (ok) "滚轮 ok" else "滚轮 失败(${tries}次)")
+        return ok
     }
 
-    /** 移动鼠标（悬停移动）：拖动鼠标板时调用，不按下任何键 */
+    /** 按住左键状态下的移动（拖拽选择/拖动窗口），节拍线程用：等到分发再返回 */
     @Synchronized
-    fun mouseMove(x: Float, y: Float): Boolean {
+    fun mouseDragSync(x: Float, y: Float): Boolean {
         val now = SystemClock.uptimeMillis()
-        return inject(mouseEvent(MotionEvent.ACTION_HOVER_MOVE, x, y, 0, now, now))
+        val down = if (mouseDownTime == 0L) now else mouseDownTime
+        return injectResult(
+            mouseEvent(
+                MotionEvent.ACTION_MOVE, x, y, MotionEvent.BUTTON_PRIMARY, down, now
+            )
+        )
     }
 
-    /** 按住左键状态下的移动（拖拽选择/拖动窗口） */
+    /** 同上，不等待回执的版本（一次性同步位置时用） */
     @Synchronized
     fun mouseDrag(x: Float, y: Float): Boolean {
         val now = SystemClock.uptimeMillis()
         val down = if (mouseDownTime == 0L) now else mouseDownTime
-        return inject(
+        return injectAsync(
             mouseEvent(
                 MotionEvent.ACTION_MOVE, x, y, MotionEvent.BUTTON_PRIMARY, down, now
             )

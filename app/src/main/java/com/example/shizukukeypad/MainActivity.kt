@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -25,6 +26,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
 import rikka.shizuku.Shizuku
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
@@ -42,6 +46,10 @@ class MainActivity : Activity() {
     private var syncingOverlaySwitch = false
 
     private val ui = Handler(Looper.getMainLooper())
+
+    /** SAF 文件选择请求码 */
+    private val REQ_EXPORT_FILE = 4101
+    private val REQ_IMPORT_FILE = 4102
 
     private val binderReceived = Shizuku.OnBinderReceivedListener { refresh() }
     private val binderDead = Shizuku.OnBinderDeadListener {
@@ -99,7 +107,6 @@ class MainActivity : Activity() {
             ?.let { findViewById<TextView>(R.id.aboutLink).text = getString(R.string.about_link_with_version, "v$it") }
         setupAlphaSlider()
         setupMouseGainSlider()
-        setupFullScreenSwitch()
         setupBlockImeSwitch()
         setupPresetButtons()
 
@@ -266,15 +273,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun setupFullScreenSwitch() {
-        val sw = findViewById<MaterialSwitch>(R.id.swFullScreenMouse)
-        sw.isChecked = KeyStore.loadFullScreenMouse(this)
-        sw.setOnCheckedChangeListener { _, checked ->
-            KeyStore.saveFullScreenMouse(this, checked)
-            OverlayService.current?.setFullScreenMode(checked)
-        }
-    }
-
     private fun setupBlockImeSwitch() {
         val sw = findViewById<MaterialSwitch>(R.id.swBlockIme)
         sw.isChecked = KeyStore.loadBlockIme(this)
@@ -299,8 +297,8 @@ class MainActivity : Activity() {
     private fun setupPresetButtons() {
         findViewById<Button>(R.id.btnPresetSave).setOnClickListener { savePresetDialog() }
         findViewById<Button>(R.id.btnPresetLoad).setOnClickListener { loadPresetDialog() }
-        findViewById<Button>(R.id.btnConfigExport).setOnClickListener { exportConfig() }
-        findViewById<Button>(R.id.btnConfigImport).setOnClickListener { confirmImport() }
+        findViewById<Button>(R.id.btnConfigExport).setOnClickListener { exportProfileFile() }
+        findViewById<Button>(R.id.btnConfigImport).setOnClickListener { importProfileFile() }
     }
 
     private fun savePresetDialog() {
@@ -371,42 +369,123 @@ class MainActivity : Activity() {
         refresh()
     }
 
-    private fun exportConfig() {
-        val json = KeyStore.exportKeys(this)
+    // ==================== 布局文件导入 / 导出 ====================
+
+    private fun exportProfileFile() {
         if (KeyStore.loadKeys(this).isEmpty()) {
             toast(getString(R.string.toast_nothing_to_export))
             return
         }
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.clip_label_config), json))
-        toast(getString(R.string.toast_config_copied))
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(Intent.EXTRA_TITLE, "hjm-keypad-layout-$stamp.json")
+        }
+        try {
+            startActivityForResult(intent, REQ_EXPORT_FILE)
+        } catch (t: Throwable) {
+            toast(getString(R.string.toast_no_file_picker))
+        }
     }
 
-    private fun confirmImport() {
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }
-            ?.getItemAt(0)?.coerceToText(this)?.toString()
+    private fun importProfileFile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf("application/json", "text/plain", "application/octet-stream")
+            )
+        }
+        try {
+            startActivityForResult(intent, REQ_IMPORT_FILE)
+        } catch (t: Throwable) {
+            toast(getString(R.string.toast_no_file_picker))
+        }
+    }
+
+    @Deprecated("用 SAF 选择文件，不需要运行时存储权限")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        when (requestCode) {
+            REQ_EXPORT_FILE -> writeProfile(uri)
+            REQ_IMPORT_FILE -> readProfileForImport(uri)
+        }
+    }
+
+    private fun writeProfile(uri: Uri) {
+        try {
+            val json = KeyStore.exportProfile(this)
+            contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+                out.flush()
+            } ?: throw IllegalStateException("no stream")
+            val name = queryDisplayName(uri) ?: "hjm-keypad-layout.json"
+            toast(getString(R.string.toast_exported_file, name))
+        } catch (t: Throwable) {
+            toast(getString(R.string.toast_export_failed, t.javaClass.simpleName))
+        }
+    }
+
+    private fun readProfileForImport(uri: Uri) {
+        val text = try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val buf = ByteArray(64 * 1024)
+                val sb = StringBuilder()
+                var total = 0
+                while (true) {
+                    val n = input.read(buf)
+                    if (n <= 0) break
+                    total += n
+                    if (total > 2 * 1024 * 1024) throw IllegalStateException("too large")
+                    sb.append(String(buf, 0, n, Charsets.UTF_8))
+                }
+                sb.toString()
+            }
+        } catch (t: Throwable) {
+            null
+        }
         if (text.isNullOrBlank()) {
-            toast(getString(R.string.toast_clipboard_empty))
+            toast(getString(R.string.toast_import_read_failed))
             return
         }
-        if (KeyStore.importableCount(text) == 0) {
-            toast(getString(R.string.toast_invalid_config))
+        val preview = KeyStore.previewProfile(text)
+        if (preview == null) {
+            toast(getString(R.string.toast_invalid_config_file))
             return
+        }
+        val extra = buildString {
+            if (preview.hasSettings) append(getString(R.string.import_includes_settings))
+            if (preview.presetCount > 0) {
+                append(getString(R.string.import_includes_presets, preview.presetCount))
+            }
         }
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.dialog_import_config)
-            .setMessage(R.string.dialog_import_message)
+            .setTitle(R.string.dialog_import_file)
+            .setMessage(getString(R.string.dialog_import_file_message, preview.keyCount, extra))
             .setPositiveButton(R.string.action_import) { _, _ ->
-                if (KeyStore.importKeys(this, text) > 0) {
+                val n = KeyStore.importProfile(this, text)
+                if (n > 0) {
                     reloadOverlay()
-                    toast(getString(R.string.toast_config_imported))
+                    toast(getString(R.string.toast_config_imported_count, n))
                     refresh()
+                } else {
+                    toast(getString(R.string.toast_invalid_config_file))
                 }
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
+
+    private fun queryDisplayName(uri: Uri): String? = runCatching {
+        contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (c.moveToFirst() && idx >= 0) c.getString(idx) else null
+        }
+    }.getOrNull()
 
     private fun reloadOverlay() {
         if (OverlayService.overlayShowing) {

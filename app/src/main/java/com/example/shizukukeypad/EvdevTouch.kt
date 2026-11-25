@@ -73,7 +73,20 @@ object EvdevTouch {
         running = false
         runCatching { proc?.destroy() }
         proc = null
+        // 必须把 thread 清掉：否则 start() 看到「旧线程还活着」会直接返回，
+        // 重启等于没做（1.8.4 的「自愈」就是这么失效的）
+        thread = null
     }
+
+    /** 最近一次收到触摸事件的时间戳 */
+    @Volatile
+    var lastEventAt = 0L
+        private set
+
+    /** 多久没收到过事件（毫秒）；从没收到过返回 Long.MAX_VALUE */
+    fun idleMs(): Long =
+        if (lastEventAt == 0L) Long.MAX_VALUE
+        else android.os.SystemClock.uptimeMillis() - lastEventAt
 
     /** 以 shell 身份启动进程。Shizuku.newProcess 是私有方法，只能反射调用。 */
     private fun shellProcess(cmd: String): Process {
@@ -231,6 +244,7 @@ object EvdevTouch {
             val ry = slotY[slot] ?: return@forEach
             now[id] = mapToScreen(dev, rx, ry)
         }
+        lastEventAt = android.os.SystemClock.uptimeMillis()
         val l = listener ?: return
         now.forEach { (id, p) ->
             val old = prev[id]
