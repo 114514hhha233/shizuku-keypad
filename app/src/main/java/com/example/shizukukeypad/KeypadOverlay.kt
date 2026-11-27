@@ -754,6 +754,10 @@ class KeypadOverlay(private val context: Context) {
         refreshEvdev()
         refreshBarLabels()
         toast(getString(if (on) R.string.toast_hot_on else R.string.toast_hot_off))
+        // 热区下触摸摇杆走原生直通，第一次切过来时把这件事说清楚
+        if (on && keys.any { it.type == KeyType.JOYSTICK && it.stickMode == 1 }) {
+            ui.postDelayed({ toast(getString(R.string.toast_hot_joystick)) }, 900)
+        }
     }
 
     /** 进入/退出按键绑定模式：菜单点一下，接下来点的那个自定义按键生效 */
@@ -1239,6 +1243,14 @@ class KeypadOverlay(private val context: Context) {
         synchronized(joyLock) { joyStates[key.id] = st }
         (v as? JoystickPad)?.resetKnob()
         if (key.stickMode != 1) return
+
+        // 热区模式下不注入输出点。
+        // 安卓同一块屏幕同一时刻只让一条手势成立：真实手指按着游戏时，我们注入的
+        // 那根属于"另一台输入设备"，会被系统丢掉（用户看到的就是"先滑再按按不动"）；
+        // 就算它先成立，反过来也会把真实手指顶掉。热区下摇杆窗口本来就是不可触摸的，
+        // 手指会直通落到游戏上——那就让游戏自己收这根手指，天然和别的指头同属一条手势。
+        // 代价是盘面要摆在游戏摇杆的位置上（编辑模式拖过去即可）。
+        if (hotMode) return
 
         // 输出点落在某个悬浮按键上时，注入的触点会被自己挡住
         if (!anchorWarned && pointOnAnyKey(anchor.x, anchor.y)) {

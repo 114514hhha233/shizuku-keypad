@@ -147,6 +147,7 @@
     <string name="toolbar_hot_off">Windows</string>
     <string name="toolbar_hot_on">Multi-touch</string>
     <string name="toast_hot_on">Multi-touch on: keys no longer block touches</string>
+    <string name="toast_hot_joystick">In multi-touch the touch-mode joystick uses native touch: place the pad over the game\'s own joystick and the finger lands on the game directly, with no injected output point</string>
     <string name="toast_hot_off">Window mode: each key takes its own touch</string>
     <string name="toolbar_mouse">Mouse</string>
     <string name="toolbar_mouse_on">Mouse on</string>
@@ -269,7 +270,7 @@
     <string name="hint_left">Left</string>
     <string name="hint_right">Right</string>
     <string name="btn_anchor_center">Touch output point: reset to default position (right of the joystick)</string>
-    <string name="stick_touch_desc">Touch mode injects a finger at the output point to push the game’s own joystick. In edit mode a yellow crosshair appears on screen; drag it to the center of the game joystick. By default it sits to the right of the joystick so the joystick window does not cover it.</string>
+    <string name="stick_touch_desc">In window mode, touch mode injects a finger at the output point to push the game’s own joystick. In edit mode a yellow crosshair appears on screen; drag it to the center of the game joystick. By default it sits to the right of the joystick so the joystick window does not cover it.\nIn multi-touch (hot zone) mode nothing is injected: fingers pass straight through to the game, so place the joystick pad directly on the game’s joystick.</string>
     <string name="inject_title">Injection method</string>
     <string name="rb_key">Keyboard event (cloud gaming / keyboard-enabled apps, can be held)</string>
     <string name="rb_touch">Touch tap (native mobile games; taps at the key’s screen position)</string>

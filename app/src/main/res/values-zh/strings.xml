@@ -147,6 +147,7 @@
     <string name="toolbar_hot_off">悬浮窗</string>
     <string name="toolbar_hot_on">多点触控</string>
     <string name="toast_hot_on">已开启多点触控：按键不再挡触摸，滑动和按键互不干扰</string>
+    <string name="toast_hot_joystick">多点触控下触摸摇杆走原生触摸：把摇杆盘摆到游戏自己的摇杆上，手指直接落到游戏，不再注入输出点</string>
     <string name="toast_hot_off">已切到悬浮窗：每个按键独占自己的触摸</string>
     <string name="toolbar_mouse">鼠标</string>
     <string name="toolbar_mouse_on">鼠标开</string>
@@ -269,7 +270,7 @@
     <string name="hint_left">左</string>
     <string name="hint_right">右</string>
     <string name="btn_anchor_center">触摸输出点：恢复默认位置（摇杆右侧）</string>
-    <string name="stick_touch_desc">触摸模式会在输出点注入一根手指，用来推游戏自己的摇杆。编辑模式下屏幕上会出现黄色十字准星，把它拖到游戏摇杆中心即可；默认在摇杆右侧，避免被摇杆窗口挡住。</string>
+    <string name="stick_touch_desc">窗口模式下触摸模式会在输出点注入一根手指，用来推游戏自己的摇杆。编辑模式下屏幕上会出现黄色十字准星，把它拖到游戏摇杆中心即可；默认在摇杆右侧，避免被摇杆窗口挡住。\n多点触控（热区）下不再注入：那时手指是直通落到游戏上的，请把摇杆盘直接摆到游戏摇杆的位置。</string>
     <string name="inject_title">注入方式</string>
     <string name="rb_key">键盘事件（云游戏 / 支持键盘的应用，可按住不放）</string>
     <string name="rb_touch">触摸点击（原生手游，点击按键所在的屏幕位置）</string>
