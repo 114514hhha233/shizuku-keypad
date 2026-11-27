@@ -353,7 +353,7 @@ object KeyStore {
                         switchable = o.optBoolean("switchable", false),
                         latch = o.optBoolean("latch", false),
                         macro = o.optString("macro", ""),
-                        stickMode = o.optInt("stickMode", 0).coerceIn(0, 1),
+                        stickMode = o.optInt("stickMode", 0).coerceIn(0, 2),
                         upCode = upCode,
                         downCode = downCode,
                         leftCode = leftCode,

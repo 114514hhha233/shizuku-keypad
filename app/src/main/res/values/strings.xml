@@ -75,7 +75,7 @@
     <string name="help_q5_body">Both dots on the status card must be green.\n· Shizuku requires version 11 or newer, and must be started again after a reboot.\n· Tap “Authorize Shizuku” when unauthorized, and “Grant overlay permission” when it is not granted.</string>
     <string name="help_q6_title">Change key position, size and key code</string>
     <string name="help_q8_title">Mouse in cloud gaming / hold fire + slide</string>
-    <string name="help_q8_body">Turn on the mouse pad (\u2196) and Multi-touch (\u25c8) in the toolbar first, then enable \"Cloud-gaming mouse (pass-through)\" on the main screen.\n\u00b7 The cursor follows your finger 1:1 \u2014 no accumulation, no sensitivity boost.\n\u00b7 Full-screen tracking rides on the Multi-touch touch-listening path: the whole screen drives the cursor while touches still reach the game, unlike the old full-screen touch layer that ate them.\n\u00b7 The left button becomes holdable: keep it pressed for 450ms to hold, it stays held after you lift; tap it again to release.</string>
+    <string name="help_q8_body">Turn on the mouse pad (\u2196) and Multi-touch (\u25c8) in the toolbar first, then enable \"Cloud-gaming mouse (pass-through)\" on the main screen.\n\u00b7 The cursor follows your finger 1:1 \u2014 no accumulation, no sensitivity boost.\n\u00b7 Full-screen tracking rides on the Multi-touch touch-listening path: the whole screen drives the cursor while touches still reach the game, unlike the old full-screen touch layer that ate them.\n\u00b7 The left button becomes holdable: keep it pressed for 450ms to hold, it stays held after you lift; tap it again to release.\n\u00b7 A joystick can be set to \u201cMouse mode\u201d: the pad itself is the touchpad \u2014 press to hold the left button, slide to move the cursor, so a single finger does \u201chold fire + slide\u201d.</string>
     <string name="help_q6_body">Tap “Edit” in the toolbar to drag keys; tap a key to change its key code, label, size, shape, injection method, or delete it.\n“＋” adds keys: letters, digits, F1-F12, arrows, numpad and mouse buttons are built in. “Macro” binds a key sequence to one key.</string>
     <string name="help_q7_title">Presets, backup and restore</string>
     <string name="help_q7_body">“Presets” on the main screen saves/loads multiple layouts; “Export to file” writes a complete JSON profile (key layout, toolbar position, opacity, mouse sensitivity, toggles and presets) that you can back up or share, and “Import from file” shows a summary before overwriting the current layout.\n“Reset layout” clears custom keys.</string>
@@ -179,6 +179,7 @@
     <string name="action_delete_confirm">Delete</string>
     <string name="dialog_stick_mode_option_key">Key mode (outputs WASD, for cloud gaming)</string>
     <string name="dialog_stick_mode_option_touch">Touch mode (injects a finger at the output point, native games)</string>
+    <string name="dialog_stick_mode_option_mouse">Mouse mode (pad acts as a touchpad: press = hold left button, slide = move the cursor)</string>
     <string name="toast_anchor_reset">The output point will return to the right of the joystick after saving; drag the crosshair in edit mode to fine-tune</string>
     <string name="shape_rounded">Rounded square</string>
     <string name="shape_circle">Circle</string>

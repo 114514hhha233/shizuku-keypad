@@ -267,6 +267,10 @@ class KeypadOverlay(private val context: Context) {
     @Volatile
     private var cloudMouse = false
 
+    /** 鼠标摇杆（stickMode=2）按住中：节拍线程据此把移动发成拖动而不是悬停 */
+    @Volatile
+    private var mouseJoyHeld = false
+
     /** 左键长按计时：token 自增即作废上一次未到时的计时 */
     private var cloudHoldToken = 0
     private var cloudHoldKeyId = -1L
@@ -276,6 +280,9 @@ class KeypadOverlay(private val context: Context) {
 
     /** 鼠标注入失败提示的节流时间戳 */
     private var lastMouseFailToastAt = 0L
+
+    /** 连续注入失败次数：假阴性不该每次都弹提示，连续多次才算真出问题 */
+    private var injectFailStreak = 0
 
     // 虚拟鼠标当前位置（屏幕像素），鼠标按键就注入在这里
     @Volatile
@@ -1267,6 +1274,9 @@ class KeypadOverlay(private val context: Context) {
         var moving = false
         var pendingX = Float.NaN
         var pendingY = Float.NaN
+        /** 鼠标模式：上一次的手指位置（增量搬光标，不用累积位移） */
+        var lastX = Float.NaN
+        var lastY = Float.NaN
     }
 
     /** 摇杆输出点（屏幕像素）；还没设置时默认放在摇杆右侧，避免和自身窗口重叠 */
@@ -1297,6 +1307,20 @@ class KeypadOverlay(private val context: Context) {
         }
         synchronized(joyLock) { joyStates[key.id] = st }
         (v as? JoystickPad)?.resetKnob()
+
+        // 鼠标模式：盘面当触控板 —— 按下即按住左键，位移搬光标，抬起松开。
+        // 一根手指就同时完成"按住开火 + 滑动"，不用再拿第二根手指去推触控板。
+        if (key.stickMode == 2) {
+            st.lastX = st.downX
+            st.lastY = st.downY
+            mouseJoyHeld = true
+            joyWorker.execute {
+                withOverlayUntouchable {
+                    ShizukuInjector.mouseButtonDown(MotionEvent.BUTTON_PRIMARY, mouseX, mouseY)
+                }
+            }
+            return
+        }
         if (key.stickMode != 1) return
 
         // 热区模式下不注入输出点。
@@ -1341,6 +1365,29 @@ class KeypadOverlay(private val context: Context) {
 
         if (key.stickMode == 0) {
             joyApplyCodes(st, joyDirection(key, dx, dy, travel))
+            return
+        }
+
+        if (key.stickMode == 2) {
+            // 鼠标模式：手指位移 1:1 搬动光标（云游戏直通模式下不乘灵敏度）
+            val lx = if (st.lastX.isNaN()) st.downX else st.lastX
+            val ly = if (st.lastY.isNaN()) st.downY else st.lastY
+            val stepX = screenX - lx
+            val stepY = screenY - ly
+            st.lastX = screenX
+            st.lastY = screenY
+            if (abs(stepX) < 0.01f && abs(stepY) < 0.01f) return
+            val gain = if (cloudMouse) 1f else mouseGain
+            synchronized(padLock) {
+                mouseX = (mouseX + stepX * gain).coerceIn(0f, (screenW - 1).toFloat())
+                mouseY = (mouseY + stepY * gain).coerceIn(0f, (screenH - 1).toFloat())
+            }
+            if (mouseOn) {
+                onMouseMoved()
+            } else {
+                // 没开光标/节拍线程时直接发，按住拖动同样成立
+                joyWorker.execute { ShizukuInjector.mouseDrag(mouseX, mouseY) }
+            }
             return
         }
 
@@ -1437,6 +1484,16 @@ class KeypadOverlay(private val context: Context) {
     private fun joyEnd(key: KeyItem) {
         val st = synchronized(joyLock) { joyStates.remove(key.id) } ?: return
         (keyViews[key.id] as? JoystickPad)?.resetKnob()
+        if (key.stickMode == 2) {
+            mouseJoyHeld = false
+            val tx = mouseX
+            val ty = mouseY
+            joyWorker.execute {
+                withOverlayUntouchable { ShizukuInjector.mouseButtonUp(tx, ty) }
+            }
+            KeyStore.saveCursor(context, tx / screenW, ty / screenH)
+            return
+        }
         if (key.stickMode == 0) {
             val codes = synchronized(st) {
                 val list = st.codes.toList()
@@ -1464,6 +1521,18 @@ class KeypadOverlay(private val context: Context) {
         synchronized(joyLock) { joyStates.clear() }
         if (snapshot.isEmpty()) return
         keyViews.values.forEach { (it as? JoystickPad)?.resetKnob() }
+        // 鼠标摇杆（按键与触控板合一）被兜底释放时必须把左键松开，不能把游戏卡在按住
+        val wasMouseHeld = snapshot.any { (kid, _) ->
+            keys.firstOrNull { it.id == kid }?.stickMode == 2
+        }
+        if (wasMouseHeld && mouseJoyHeld) {
+            mouseJoyHeld = false
+            val tx = mouseX
+            val ty = mouseY
+            joyWorker.execute {
+                withOverlayUntouchable { ShizukuInjector.mouseButtonUp(tx, ty) }
+            }
+        }
         joyWorker.execute {
             snapshot.forEach { (_, st) ->
                 synchronized(st) {
@@ -2354,7 +2423,14 @@ class KeypadOverlay(private val context: Context) {
             ui.postDelayed({
                 ui.removeCallbacks(restoreNow)
                 restoreNow.run()
-                if (!ok) {
+                if (ok) {
+                    injectFailStreak = 0
+                } else {
+                    injectFailStreak++
+                }
+                // 单次"失败"多半是 WAIT_FOR_RESULT 超时的假阴性：事件已经送到了，只是没等到回执。
+                // 用户看到的"左键偶尔注入失败但其实生效"就是这一类，所以连续失败 3 次才值得提示。
+                if (!ok && injectFailStreak >= 3) {
                     val nowMs = SystemClock.uptimeMillis()
                     if (nowMs - lastMouseFailToastAt > 1500L) {
                         lastMouseFailToastAt = nowMs
@@ -2533,10 +2609,11 @@ class KeypadOverlay(private val context: Context) {
             android.R.layout.simple_spinner_dropdown_item,
             listOf(
                 getString(R.string.dialog_stick_mode_option_key),
-                getString(R.string.dialog_stick_mode_option_touch)
+                getString(R.string.dialog_stick_mode_option_touch),
+                getString(R.string.dialog_stick_mode_option_mouse)
             )
         )
-        spinnerStickMode.setSelection((existing?.stickMode ?: 0).coerceIn(0, 1))
+        spinnerStickMode.setSelection((existing?.stickMode ?: 0).coerceIn(0, 2))
         etStickUp.setText((existing?.upCode ?: KeyEvent.KEYCODE_W).toString())
         etStickDown.setText((existing?.downCode ?: KeyEvent.KEYCODE_S).toString())
         etStickLeft.setText((existing?.leftCode ?: KeyEvent.KEYCODE_A).toString())
@@ -2667,7 +2744,7 @@ class KeypadOverlay(private val context: Context) {
                     val downCode = dirCode(etStickDown, KeyEvent.KEYCODE_S)
                     val leftCode = dirCode(etStickLeft, KeyEvent.KEYCODE_A)
                     val rightCode = dirCode(etStickRight, KeyEvent.KEYCODE_D)
-                    val stickMode = spinnerStickMode.selectedItemPosition.coerceIn(0, 1)
+                    val stickMode = spinnerStickMode.selectedItemPosition.coerceIn(0, 2)
                     if (existing == null) {
                         val offset = 0.035f * (keys.size % 5)
                         val item = KeyItem(
@@ -3410,16 +3487,16 @@ class KeypadOverlay(private val context: Context) {
     /** 把节拍线程的发送动作接到注入器上 */
     private fun wireMouseEngine() {
         MouseEngine.sendPaced = { x, y ->
-            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y)
             else ShizukuInjector.mouseMove(x, y)
         }
         // 同步注入被系统拖住时，节拍线程会自己降级成这条（返回即走，不堵 UI）
         MouseEngine.sendAsync = { x, y ->
-            if (mouseLeftHeld) ShizukuInjector.mouseDrag(x, y)
+            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDrag(x, y)
             else ShizukuInjector.mouseMove(x, y)
         }
         MouseEngine.sendSync = { x, y ->
-            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y)
             else ShizukuInjector.mouseMoveSync(x, y)
         }
         MouseEngine.setTarget(mouseX, mouseY)
