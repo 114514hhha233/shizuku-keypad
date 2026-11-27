@@ -470,7 +470,7 @@ class KeypadOverlay(private val context: Context) {
         mouseGain = percent.coerceIn(50, 250) / 100f
     }
 
-    /** 云游戏鼠标：直通坐标 + 左键长按按住 */
+    /** 云游戏鼠标：直通坐标 + 全屏跟手 + 左键长按按住 */
     fun setCloudMouse(on: Boolean) {
         if (cloudMouse == on) return
         cloudMouse = on
@@ -478,7 +478,12 @@ class KeypadOverlay(private val context: Context) {
         cloudHoldKeyId = -1L
         cloudReleaseTapId = -1L
         if (!on) releaseMouseLeft()
+        applyPadTouchability()
         toast(getString(if (on) R.string.toast_cloud_mouse_on else R.string.toast_cloud_mouse_off))
+        // 全屏跟手要靠旁听（热区）才不抢触摸；没开热区时只能在小触控板上拖
+        if (on && !hotMode) {
+            ui.postDelayed({ toast(getString(R.string.toast_cloud_mouse_need_hot)) }, 900)
+        }
     }
 
     fun hide() {
@@ -778,6 +783,7 @@ class KeypadOverlay(private val context: Context) {
         // 切换时先把按下的状态清干净，避免卡键
         worker.execute { ShizukuInjector.releaseAll() }
         applyKeyTouchability()
+        applyPadTouchability()
         refreshEvdev()
         refreshBarLabels()
         toast(getString(if (on) R.string.toast_hot_on else R.string.toast_hot_off))
@@ -1144,6 +1150,28 @@ class KeypadOverlay(private val context: Context) {
         keyViews[key.id] = v
         if (allKeysOff) v.visibility = View.GONE
         applyKeyTouchability()
+    }
+
+    /**
+     * 云游戏鼠标 + 多点触控：触控板这块小窗让出触摸并隐藏 —— 整屏都由旁听驱动光标，
+     * 它再留在屏幕上既没用又会抢走底下那块区域的游戏触摸。
+     * 没开热区时它还是那块能按住拖的小板（全屏窗会抢触摸，所以那时只能小块拖）。
+     */
+    private fun applyPadTouchability() {
+        val v = dragLayer ?: return
+        val p = dragParams ?: return
+        val fullScreen = cloudMouse && hotMode && !editMode
+        val flags = if (fullScreen) {
+            p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        } else {
+            p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        }
+        val vis = if (fullScreen) View.GONE else View.VISIBLE
+        if (p.flags != flags || v.visibility != vis) {
+            p.flags = flags
+            v.visibility = vis
+            runCatching { wm.updateViewLayout(v, p) }
+        }
     }
 
     /**
@@ -2032,7 +2060,7 @@ class KeypadOverlay(private val context: Context) {
             if (x >= loc[0] && x <= loc[0] + v.width && y >= loc[1] && y <= loc[1] + v.height) {
                 hotPointers[k.id] = id
                 hitKey = true
-                if (k.type.isMouse) {
+                if (k.type.isMouse && !cloudMouse) {
                     // 鼠标按键在热区里只做一次触发，按下后自动释放
                     val t = k.type
                     pressCounts[k.id] = (pressCounts[k.id] ?: 0) + 1
@@ -2040,9 +2068,17 @@ class KeypadOverlay(private val context: Context) {
                     worker.execute { injectMouse { doMouseKey(t) } }
                     ui.postDelayed({ releaseKey(k) }, 90)
                 } else {
+                    // 云游戏鼠标下鼠标键也走正常按下路径：长按才能转成「按住」，
+                    // 这样热区里也能「按住开火 + 别的手指滑屏」
                     pressKey(k, x, y)
                 }
             }
+        }
+        // 云游戏鼠标：整屏都是触控板。没按到摇杆/按键的手指就当「光标手指」，
+        // 绝对坐标直通（手指在哪，光标就在哪）；触摸照旧直通给游戏，一个像素都不抢。
+        if (cloudMouse && mouseOn && !hitKey) {
+            hotCursorLast[id] = PointF(x, y)
+            hotCursorTravel[id] = 0f
         }
     }
 
@@ -2407,6 +2443,7 @@ class KeypadOverlay(private val context: Context) {
         refreshBarLabels()
         anchorWarned = false
         applyKeyTouchability()
+        applyPadTouchability()
         syncAnchorMarkers()
         refreshEvdev()
         if (!editMode) {
@@ -3451,6 +3488,9 @@ class KeypadOverlay(private val context: Context) {
      * 返回 true 表示这颗手指归触控板，后面的按键热区逻辑别再去处理它。
      */
     private fun handlePadEvdev(action: Int, id: Int, x: Float, y: Float): Boolean {
+        // 云游戏鼠标 + 多点触控：整屏由旁听驱动光标，触控板这块小窗不参与，
+        // 免得它和全屏拖动抢同一根手指
+        if (cloudMouse && hotMode) return false
         // 这根手指已经归摇杆了：别再当成触控板拖动去抢，
         // 否则摇杆手指会被触控板"回头认领"，位移被吞掉就推不动了
         if (action != EvdevTouch.DOWN && hotMode && hotJoys.containsKey(id)) return false
@@ -3864,6 +3904,7 @@ class KeypadOverlay(private val context: Context) {
         runCatching { wm.addView(pad, p) }
         dragLayer = pad
         dragParams = p
+        applyPadTouchability()
     }
 
 

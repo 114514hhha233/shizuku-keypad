@@ -36,7 +36,7 @@
     <string name="alpha_label_default">按键不透明度：100%</string>
     <string name="mouse_gain_label">鼠标灵敏度：%1$d%%</string>
     <string name="cloud_mouse_title">云游戏鼠标（坐标直通）</string>
-    <string name="cloud_mouse_desc">开：光标 1:1 跟手，不做相对累积、不做灵敏度放大；左键长按即按住，再轻点一下松开\n云游戏里「按住开火 + 滑动瞄准」就靠它\n需要先打开工具栏的鼠标（↖）</string>
+    <string name="cloud_mouse_desc">开：光标 1:1 跟手（手指在哪，光标就在哪），不做相对累积、不做灵敏度放大；左键长按即按住，再轻点一下松开\n打开工具栏「◈ 多点触控」后整屏都算触控板：由旁听驱动光标，一个像素都不抢游戏触摸；不开只能用那块小触控板拖\n云游戏里「按住开火 + 滑动瞄准」就靠它</string>
     <string name="mouse_gain_label_default">鼠标灵敏度：150%</string>
     <string name="block_ime">拦截系统输入法</string>
     <string name="block_ime_desc">开：显示虚拟按键期间用内置空输入法顶替，避免系统键盘弹出遮挡、字母被转成中文\n隐藏按键或退出应用时自动恢复原输入法\n需要 Shizuku 授权</string>
@@ -75,7 +75,7 @@
     <string name="help_q5_body">状态卡两个圆点都变绿才可用。\n· Shizuku 需要 11 以上版本，手机重启后要重新启动 Shizuku。\n· 未授权时点「授权 Shizuku」；未授予悬浮窗时点「授予悬浮窗权限」。</string>
     <string name="help_q6_title">修改按键位置、大小和键值</string>
     <string name="help_q8_title">云游戏里怎么用鼠标 / 按住开火 + 滑动</string>
-    <string name="help_q8_body">先在工具栏打开鼠标（↖），再在主界面打开「云游戏鼠标（坐标直通）」。\n· 开启后光标 1:1 跟手：手指在哪，光标就在哪，不做相对累积也不放大灵敏度。\n· 左键改成长按按住：按住 450ms 不动即按住，抬手也保持；再轻点一下这个键就松开。\n· 于是「按住开火 + 滑动瞄准」= 长按左键键按住 + 另一根手指在触控板滑动，两个动作互不抢触摸。\n· 实测云游戏客户端会把注入的鼠标认成真鼠标并跟随光标。</string>
+    <string name="help_q8_body">先在工具栏打开鼠标（↖）和多点触控（◈），再在主界面打开「云游戏鼠标（坐标直通）」。\n· 开启后光标 1:1 跟手：手指在哪，光标就在哪，不做相对累积也不放大灵敏度。\n· 全屏跟手靠的是「多点触控」那套旁听：整屏都能驱动光标，触摸却照样直通游戏，不会像以前那层全屏触摸窗一样把游戏触摸吃掉。\n· 左键改成长按按住：按住 450ms 不动即按住，抬手也保持；再轻点一下这个键就松开。</string>
     <string name="help_q6_body">工具栏点「✎ 编辑」后可直接拖动按键；点按键可改键位、显示文字、大小、形状、注入方式，或删除。\n「＋」添加按键，内置字母、数字、F1-F12、方向键、小键盘和鼠标键；「⚡ 宏」可以把一串按键绑到一个键上。</string>
     <string name="help_q7_title">预设、备份与恢复</string>
     <string name="help_q7_body">主界面「配置预设」可保存/读取多套布局；「导出到文件」生成的 JSON 是完整档案（按键布局、工具栏位置、不透明度、鼠标灵敏度、各项开关与预设），可以备份或分享；「从文件导入」会先显示摘要再覆盖当前布局。\n「恢复默认布局」会清除自定义按键。</string>
@@ -199,6 +199,7 @@
     <string name="toast_left_held">左键已按住，轻点触控板或这个键松开</string>
     <string name="toast_cloud_mouse_on">云游戏鼠标已开：光标 1:1 跟手，长按左键即按住</string>
     <string name="toast_cloud_mouse_off">云游戏鼠标已关：恢复相对滑动 + 灵敏度</string>
+    <string name="toast_cloud_mouse_need_hot">全屏跟手需要打开工具栏「◈ 多点触控」：那时整屏由旁听驱动，触摸照样落给游戏；不开只能用触控板拖</string>
     <string name="toast_left_released">左键已松开</string>
     <string name="panel_key_symbols">符</string>
     <string name="panel_key_space">空格</string>

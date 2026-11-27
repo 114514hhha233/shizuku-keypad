@@ -36,7 +36,7 @@
     <string name="alpha_label_default">Key opacity: 100%</string>
     <string name="mouse_gain_label">Mouse sensitivity: %1$d%%</string>
     <string name="cloud_mouse_title">Cloud-gaming mouse (pass-through)</string>
-    <string name="cloud_mouse_desc">On: the cursor follows your finger 1:1 (no accumulation, no sensitivity boost), and the left button can be held by long-pressing it — long-press to hold, tap again to release\nMakes \"hold fire + slide to aim\" work in cloud games\nRequires the mouse pad (↖ on the toolbar) to be enabled</string>
+    <string name="cloud_mouse_desc">On: the cursor follows your finger 1:1 (no accumulation, no sensitivity boost); the left button can be held by long-pressing it \u2014 long-press to hold, tap again to release\nWith the toolbar\u2019s \u201cMulti-touch\u201d mode on, the whole screen becomes the pad, driven by touch listening and never stealing a single touch from the game; without it only the small pad works\nMakes \"hold fire + slide to aim\" work in cloud games</string>
     <string name="mouse_gain_label_default">Mouse sensitivity: 150%</string>
     <string name="block_ime">Block system IME</string>
     <string name="block_ime_desc">On: while virtual keys are shown, a built-in blank IME takes over so the system keyboard cannot cover the screen or turn letters into Chinese\nRestores the previous IME when keys are hidden or the app exits\nRequires Shizuku authorization</string>
@@ -75,7 +75,7 @@
     <string name="help_q5_body">Both dots on the status card must be green.\n· Shizuku requires version 11 or newer, and must be started again after a reboot.\n· Tap “Authorize Shizuku” when unauthorized, and “Grant overlay permission” when it is not granted.</string>
     <string name="help_q6_title">Change key position, size and key code</string>
     <string name="help_q8_title">Mouse in cloud gaming / hold fire + slide</string>
-    <string name="help_q8_body">Turn on the mouse pad (\u2196) in the toolbar first, then enable "Cloud-gaming mouse (pass-through)" on the main screen.\n\u00b7 The cursor follows your finger 1:1 \u2014 no accumulation, no sensitivity boost.\n\u00b7 The left button becomes holdable: keep it pressed for 450ms to hold, it stays held after you lift; tap it again to release.\n\u00b7 So "hold fire + slide to aim" = long-press the left button key, then slide with another finger on the mouse pad; the two never fight over touch ownership.\n\u00b7 Verified: cloud-gaming clients accept the injected mouse as a real mouse and follow the cursor.</string>
+    <string name="help_q8_body">Turn on the mouse pad (\u2196) and Multi-touch (\u25c8) in the toolbar first, then enable \"Cloud-gaming mouse (pass-through)\" on the main screen.\n\u00b7 The cursor follows your finger 1:1 \u2014 no accumulation, no sensitivity boost.\n\u00b7 Full-screen tracking rides on the Multi-touch touch-listening path: the whole screen drives the cursor while touches still reach the game, unlike the old full-screen touch layer that ate them.\n\u00b7 The left button becomes holdable: keep it pressed for 450ms to hold, it stays held after you lift; tap it again to release.</string>
     <string name="help_q6_body">Tap “Edit” in the toolbar to drag keys; tap a key to change its key code, label, size, shape, injection method, or delete it.\n“＋” adds keys: letters, digits, F1-F12, arrows, numpad and mouse buttons are built in. “Macro” binds a key sequence to one key.</string>
     <string name="help_q7_title">Presets, backup and restore</string>
     <string name="help_q7_body">“Presets” on the main screen saves/loads multiple layouts; “Export to file” writes a complete JSON profile (key layout, toolbar position, opacity, mouse sensitivity, toggles and presets) that you can back up or share, and “Import from file” shows a summary before overwriting the current layout.\n“Reset layout” clears custom keys.</string>
@@ -199,6 +199,7 @@
     <string name="toast_left_held">Left button held; tap the touchpad or the button to release</string>
     <string name="toast_cloud_mouse_on">Cloud-gaming mouse on: cursor follows your finger 1:1, long-press the left button to hold it</string>
     <string name="toast_cloud_mouse_off">Cloud-gaming mouse off: back to relative movement with sensitivity</string>
+    <string name="toast_cloud_mouse_need_hot">Full-screen tracking needs the toolbar\u2019s “Multi-touch” mode: the whole screen is then driven by touch listening and touches still reach the game; otherwise only the pad works</string>
     <string name="toast_left_released">Left button released</string>
     <string name="panel_key_symbols">Sym</string>
     <string name="panel_key_space">Space</string>
