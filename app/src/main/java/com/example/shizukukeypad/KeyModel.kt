@@ -58,7 +58,11 @@ data class KeyItem(
     var rightCode: Int = KeyEvent.KEYCODE_D,
     /** 触摸模式输出点（屏幕比例）；小于 0 表示还没设置，自动放在摇杆右侧 */
     var anchorCx: Float = -1f,
-    var anchorCy: Float = -1f
+    var anchorCy: Float = -1f,
+    /** 鼠标摇杆（stickMode=2）按住时注入什么：0 左键，1 右键，2 中键，3 自定义键值 */
+    var mouseHold: Int = 0,
+    /** mouseHold=3 时按住/松开的键值 */
+    var mouseHoldCode: Int = 0
 )
 
 /** 键位目录中的一项；鼠标动作没有 keyCode，用 type 区分。
@@ -354,6 +358,8 @@ object KeyStore {
                         latch = o.optBoolean("latch", false),
                         macro = o.optString("macro", ""),
                         stickMode = o.optInt("stickMode", 0).coerceIn(0, 2),
+                        mouseHold = o.optInt("mouseHold", 0).coerceIn(0, 3),
+                        mouseHoldCode = o.optInt("mouseHoldCode", 0),
                         upCode = upCode,
                         downCode = downCode,
                         leftCode = leftCode,
@@ -386,6 +392,8 @@ object KeyStore {
                     .put("latch", k.latch)
                     .put("macro", k.macro)
                     .put("stickMode", k.stickMode)
+                    .put("mouseHold", k.mouseHold)
+                    .put("mouseHoldCode", k.mouseHoldCode)
                     .put("upCode", k.upCode)
                     .put("downCode", k.downCode)
                     .put("leftCode", k.leftCode)

@@ -608,27 +608,19 @@ object ShizukuInjector {
         return ok
     }
 
-    /** 按住左键状态下的移动（拖拽选择/拖动窗口），节拍线程用：等到分发再返回 */
+    /** 按住某个鼠标键状态下的移动（拖拽选择/拖动窗口），节拍线程用：等到分发再返回 */
     @Synchronized
-    fun mouseDragSync(x: Float, y: Float): Boolean {
+    fun mouseDragSync(x: Float, y: Float, button: Int = MotionEvent.BUTTON_PRIMARY): Boolean {
         val now = SystemClock.uptimeMillis()
         val down = if (mouseDownTime == 0L) now else mouseDownTime
-        return injectResult(
-            mouseEvent(
-                MotionEvent.ACTION_MOVE, x, y, MotionEvent.BUTTON_PRIMARY, down, now
-            )
-        )
+        return injectResult(mouseEvent(MotionEvent.ACTION_MOVE, x, y, button, down, now))
     }
 
     /** 同上，不等待回执的版本（一次性同步位置时用） */
     @Synchronized
-    fun mouseDrag(x: Float, y: Float): Boolean {
+    fun mouseDrag(x: Float, y: Float, button: Int = MotionEvent.BUTTON_PRIMARY): Boolean {
         val now = SystemClock.uptimeMillis()
         val down = if (mouseDownTime == 0L) now else mouseDownTime
-        return injectAsync(
-            mouseEvent(
-                MotionEvent.ACTION_MOVE, x, y, MotionEvent.BUTTON_PRIMARY, down, now
-            )
-        )
+        return injectAsync(mouseEvent(MotionEvent.ACTION_MOVE, x, y, button, down, now))
     }
 }

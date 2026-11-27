@@ -179,6 +179,12 @@
     <string name="action_delete_confirm">Delete</string>
     <string name="dialog_stick_mode_option_key">Key mode (outputs WASD, for cloud gaming)</string>
     <string name="dialog_stick_mode_option_touch">Touch mode (injects a finger at the output point, native games)</string>
+    <string name="dialog_mouse_hold_section">Hold injects</string>
+    <string name="mouse_hold_option_left">Left button (hold = fire/drag)</string>
+    <string name="mouse_hold_option_right">Right button</string>
+    <string name="mouse_hold_option_middle">Middle button</string>
+    <string name="mouse_hold_option_code">Custom key code (number below)</string>
+    <string name="hint_mouse_hold_code">Key code, e.g. 4 = A, 85 = Space</string>
     <string name="dialog_stick_mode_option_mouse">Mouse mode (pad acts as a touchpad: press = hold left button, slide = move the cursor)</string>
     <string name="toast_anchor_reset">The output point will return to the right of the joystick after saving; drag the crosshair in edit mode to fine-tune</string>
     <string name="shape_rounded">Rounded square</string>

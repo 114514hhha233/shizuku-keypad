@@ -272,6 +272,42 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp" />
 
+            <!-- 鼠标模式下：按住时注入什么（左键 / 右键 / 中键 / 自定义键值） -->
+            <LinearLayout
+                android:id="@+id/llMouseHold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/dialog_mouse_hold_section"
+                    android:textColor="#7C8AA0"
+                    android:textSize="11sp" />
+
+                <Spinner
+                    android:id="@+id/spinnerMouseHold"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp" />
+
+                <EditText
+                    android:id="@+id/etMouseHoldCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/dlg_field"
+                    android:gravity="center"
+                    android:hint="@string/hint_mouse_hold_code"
+                    android:inputType="number"
+                    android:maxLength="3"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

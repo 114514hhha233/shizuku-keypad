@@ -271,6 +271,10 @@ class KeypadOverlay(private val context: Context) {
     @Volatile
     private var mouseJoyHeld = false
 
+    /** 鼠标摇杆当前按住的是哪个鼠标键（拖动时要带同一个 buttonState） */
+    @Volatile
+    private var joyMouseButton = MotionEvent.BUTTON_PRIMARY
+
     /** 左键长按计时：token 自增即作废上一次未到时的计时 */
     private var cloudHoldToken = 0
     private var cloudHoldKeyId = -1L
@@ -1277,6 +1281,10 @@ class KeypadOverlay(private val context: Context) {
         /** 鼠标模式：上一次的手指位置（增量搬光标，不用累积位移） */
         var lastX = Float.NaN
         var lastY = Float.NaN
+        /** 鼠标模式按住时注入什么（键值 / 鼠标键） */
+        var holdIsKey = false
+        var holdCode = 0
+        var holdButton = 0
     }
 
     /** 摇杆输出点（屏幕像素）；还没设置时默认放在摇杆右侧，避免和自身窗口重叠 */
@@ -1313,10 +1321,24 @@ class KeypadOverlay(private val context: Context) {
         if (key.stickMode == 2) {
             st.lastX = st.downX
             st.lastY = st.downY
-            mouseJoyHeld = true
+            st.holdIsKey = key.mouseHold == 3 && key.mouseHoldCode > 0
+            st.holdCode = key.mouseHoldCode
+            st.holdButton = when (key.mouseHold) {
+                1 -> MotionEvent.BUTTON_SECONDARY
+                2 -> MotionEvent.BUTTON_TERTIARY
+                3 -> 0
+                else -> MotionEvent.BUTTON_PRIMARY
+            }
+            // 按住鼠标键时，移动要发成拖动；按住的是键值，移动就还是普通悬停
+            mouseJoyHeld = st.holdButton != 0
+            joyMouseButton = st.holdButton
             joyWorker.execute {
-                withOverlayUntouchable {
-                    ShizukuInjector.mouseButtonDown(MotionEvent.BUTTON_PRIMARY, mouseX, mouseY)
+                when {
+                    st.holdIsKey -> ShizukuInjector.keyDown(st.holdCode)
+                    st.holdButton != 0 -> withOverlayUntouchable {
+                        ShizukuInjector.mouseButtonDown(st.holdButton, mouseX, mouseY)
+                    }
+                    else -> Unit  // 只滑不按
                 }
             }
             return
@@ -1385,8 +1407,14 @@ class KeypadOverlay(private val context: Context) {
             if (mouseOn) {
                 onMouseMoved()
             } else {
-                // 没开光标/节拍线程时直接发，按住拖动同样成立
-                joyWorker.execute { ShizukuInjector.mouseDrag(mouseX, mouseY) }
+                // 没开光标/节拍线程时直接发：按住鼠标键发拖动，否则发悬停
+                val bx = mouseX
+                val by = mouseY
+                val btn = st.holdButton
+                joyWorker.execute {
+                    if (btn != 0) ShizukuInjector.mouseDrag(bx, by, btn)
+                    else ShizukuInjector.mouseMove(bx, by)
+                }
             }
             return
         }
@@ -1489,7 +1517,13 @@ class KeypadOverlay(private val context: Context) {
             val tx = mouseX
             val ty = mouseY
             joyWorker.execute {
-                withOverlayUntouchable { ShizukuInjector.mouseButtonUp(tx, ty) }
+                when {
+                    st.holdIsKey && st.holdCode > 0 -> ShizukuInjector.keyUp(st.holdCode)
+                    st.holdButton != 0 -> withOverlayUntouchable {
+                        ShizukuInjector.mouseButtonUp(tx, ty)
+                    }
+                    else -> Unit
+                }
             }
             KeyStore.saveCursor(context, tx / screenW, ty / screenH)
             return
@@ -1521,17 +1555,25 @@ class KeypadOverlay(private val context: Context) {
         synchronized(joyLock) { joyStates.clear() }
         if (snapshot.isEmpty()) return
         keyViews.values.forEach { (it as? JoystickPad)?.resetKnob() }
-        // 鼠标摇杆（按键与触控板合一）被兜底释放时必须把左键松开，不能把游戏卡在按住
-        val wasMouseHeld = snapshot.any { (kid, _) ->
-            keys.firstOrNull { it.id == kid }?.stickMode == 2
+        // 鼠标摇杆（按键与触控板合一）被兜底释放时必须把按住的东西松开，不能把游戏卡在按住
+        val holds = snapshot.mapNotNull { (_, st) ->
+            when {
+                st.holdIsKey && st.holdCode > 0 -> st.holdCode to 0
+                st.holdButton != 0 -> 0 to st.holdButton
+                else -> null
+            }
         }
-        if (wasMouseHeld && mouseJoyHeld) {
+        val mouseHeld = holds.any { it.second != 0 }
+        if (mouseHeld && mouseJoyHeld) {
             mouseJoyHeld = false
             val tx = mouseX
             val ty = mouseY
             joyWorker.execute {
                 withOverlayUntouchable { ShizukuInjector.mouseButtonUp(tx, ty) }
             }
+        }
+        if (holds.isNotEmpty()) {
+            joyWorker.execute { holds.forEach { (code, _) -> if (code > 0) ShizukuInjector.keyUp(code) } }
         }
         joyWorker.execute {
             snapshot.forEach { (_, st) ->
@@ -2604,6 +2646,10 @@ class KeypadOverlay(private val context: Context) {
         cbOneKey.isChecked = existing?.switchable ?: false
         cbLatch.isChecked = existing?.latch ?: false
 
+        val llMouseHold = view.findViewById<LinearLayout>(R.id.llMouseHold)
+        val spinnerMouseHold = view.findViewById<Spinner>(R.id.spinnerMouseHold)
+        val etMouseHoldCode = view.findViewById<EditText>(R.id.etMouseHoldCode)
+
         spinnerStickMode.adapter = ArrayAdapter(
             themeCtx,
             android.R.layout.simple_spinner_dropdown_item,
@@ -2614,6 +2660,53 @@ class KeypadOverlay(private val context: Context) {
             )
         )
         spinnerStickMode.setSelection((existing?.stickMode ?: 0).coerceIn(0, 2))
+
+        // 鼠标摇杆的「按住时注入什么」：左键 / 右键 / 中键 / 自定义键值
+        spinnerMouseHold.adapter = ArrayAdapter(
+            themeCtx,
+            android.R.layout.simple_spinner_dropdown_item,
+            listOf(
+                getString(R.string.mouse_hold_option_left),
+                getString(R.string.mouse_hold_option_right),
+                getString(R.string.mouse_hold_option_middle),
+                getString(R.string.mouse_hold_option_code)
+            )
+        )
+        spinnerMouseHold.setSelection((existing?.mouseHold ?: 0).coerceIn(0, 3))
+        if ((existing?.mouseHoldCode ?: 0) > 0) {
+            etMouseHoldCode.setText(existing!!.mouseHoldCode.toString())
+        }
+        fun syncMouseHoldVisibility() {
+            val mouseMode = spinnerStickMode.selectedItemPosition == 2
+            llMouseHold.visibility = if (mouseMode) View.VISIBLE else View.GONE
+            etMouseHoldCode.visibility =
+                if (mouseMode && spinnerMouseHold.selectedItemPosition == 3) View.VISIBLE else View.GONE
+        }
+        syncMouseHoldVisibility()
+        spinnerStickMode.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: android.widget.AdapterView<*>?,
+                child: View?,
+                position: Int,
+                id: Long
+            ) {
+                syncMouseHoldVisibility()
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+        spinnerMouseHold.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: android.widget.AdapterView<*>?,
+                child: View?,
+                position: Int,
+                id: Long
+            ) {
+                syncMouseHoldVisibility()
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
         etStickUp.setText((existing?.upCode ?: KeyEvent.KEYCODE_W).toString())
         etStickDown.setText((existing?.downCode ?: KeyEvent.KEYCODE_S).toString())
         etStickLeft.setText((existing?.leftCode ?: KeyEvent.KEYCODE_A).toString())
@@ -2759,6 +2852,9 @@ class KeypadOverlay(private val context: Context) {
                             switchable = switchable,
                             latch = latchFlag,
                             stickMode = stickMode,
+                            mouseHold = spinnerMouseHold.selectedItemPosition.coerceIn(0, 3),
+                            mouseHoldCode = etMouseHoldCode.text.toString().trim()
+                                .toIntOrNull()?.takeIf { it in 1..400 } ?: 0,
                             upCode = upCode,
                             downCode = downCode,
                             leftCode = leftCode,
@@ -2793,6 +2889,9 @@ class KeypadOverlay(private val context: Context) {
                         existing.switchable = switchable
                         existing.latch = latchFlag
                         existing.stickMode = stickMode
+                        existing.mouseHold = spinnerMouseHold.selectedItemPosition.coerceIn(0, 3)
+                        existing.mouseHoldCode = etMouseHoldCode.text.toString().trim()
+                            .toIntOrNull()?.takeIf { it in 1..400 } ?: 0
                         existing.upCode = upCode
                         existing.downCode = downCode
                         existing.leftCode = leftCode
@@ -3487,16 +3586,19 @@ class KeypadOverlay(private val context: Context) {
     /** 把节拍线程的发送动作接到注入器上 */
     private fun wireMouseEngine() {
         MouseEngine.sendPaced = { x, y ->
-            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y)
+            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            else if (mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y, joyMouseButton)
             else ShizukuInjector.mouseMove(x, y)
         }
         // 同步注入被系统拖住时，节拍线程会自己降级成这条（返回即走，不堵 UI）
         MouseEngine.sendAsync = { x, y ->
-            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDrag(x, y)
+            if (mouseLeftHeld) ShizukuInjector.mouseDrag(x, y)
+            else if (mouseJoyHeld) ShizukuInjector.mouseDrag(x, y, joyMouseButton)
             else ShizukuInjector.mouseMove(x, y)
         }
         MouseEngine.sendSync = { x, y ->
-            if (mouseLeftHeld || mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y)
+            if (mouseLeftHeld) ShizukuInjector.mouseDragSync(x, y)
+            else if (mouseJoyHeld) ShizukuInjector.mouseDragSync(x, y, joyMouseButton)
             else ShizukuInjector.mouseMoveSync(x, y)
         }
         MouseEngine.setTarget(mouseX, mouseY)

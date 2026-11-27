@@ -179,6 +179,12 @@
     <string name="action_delete_confirm">删除</string>
     <string name="dialog_stick_mode_option_key">键值模式（输出 WASD，云游戏可用）</string>
     <string name="dialog_stick_mode_option_touch">触摸模式（在输出点注入手指，原生手游）</string>
+    <string name="dialog_mouse_hold_section">按住时注入</string>
+    <string name="mouse_hold_option_left">鼠标左键（按住=开火/拖动）</string>
+    <string name="mouse_hold_option_right">鼠标右键</string>
+    <string name="mouse_hold_option_middle">鼠标中键</string>
+    <string name="mouse_hold_option_code">自定义键值（填下面的数字）</string>
+    <string name="hint_mouse_hold_code">键值，例如 4 = A、85 = 空格</string>
     <string name="dialog_stick_mode_option_mouse">鼠标模式（盘面即触控板：按下=按住左键，滑动=移动光标）</string>
     <string name="toast_anchor_reset">保存后输出点回到摇杆右侧，编辑模式下可再拖准星微调</string>
     <string name="shape_rounded">圆角方形</string>
