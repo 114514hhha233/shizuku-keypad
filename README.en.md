@@ -55,7 +55,7 @@ In multi-touch mode every key window is set to `FLAG_NOT_TOUCHABLE`, so keys no 
    ROTATION_270 : ((1 - ny) * W, nx * H)
    ```
 
-4. **Hot-zone hit test**: when a finger goes down, its screen coordinate is tested against each key's real screen rectangle (window position + size). A hit injects that key; lifting releases it by finger identity. Fingers that land on empty space drive the full-screen mouse cursor.
+4. **Hot-zone hit test**: when a finger goes down, its screen coordinate is tested against each key's real screen rectangle (window position + size); the joystick is hit-tested against its disc. A hit injects that key; lifting releases it by finger identity.
 
 ### What you get
 
@@ -72,7 +72,8 @@ In multi-touch mode every key window is set to `FLAG_NOT_TOUCHABLE`, so keys no 
 | First finger | can land anywhere | must land on a key window |
 | Press keys while dragging camera | ✅ yes | ❌ later fingers are lost |
 | Native touch | fully preserved | fully preserved |
-| Joystick / trackpad gestures | ❌ not supported | ✅ supported |
+| Joystick | ✅ hot zone (disc hit test) | ✅ touchable window |
+| Trackpad gestures | ❌ not supported | ✅ supported |
 | Requires | Shizuku + `getevent` listening | Shizuku injection |
 
 The toolbar "◈ Multi-touch" button is on by default; tap it to switch to "Windows" mode (for devices that cannot listen to raw touch).
@@ -95,7 +96,7 @@ The toolbar "◈ Multi-touch" button is on by default; tap it to switch to "Wind
 ### Virtual joystick
 - **Key-value mode**: 8-direction output with a 22% center dead zone, default W/S/A/D (51/47/29/32), each direction remappable.
 - **Touch mode**: injects a finger at an output point to push the game's own joystick; the output point can be dragged with a crosshair in edit mode.
-- The joystick is not supported in multi-touch mode yet; use window mode.
+- The joystick uses the same hot zone: a finger inside the disc counts as a hit, so one finger can push the stick while another keeps dragging the camera; two sticks can be pushed by two fingers at once.
 
 ### Mouse
 - **Touchpad**: drag on the small panel to move the cursor; tap for left click, two-finger tap for right click, two-finger swipe for the wheel, long press to hold the left button.
@@ -151,7 +152,7 @@ Screen size comes from `currentWindowMetrics` (real pixels for the current rotat
 - Multi-touch mode depends on Shizuku and `getevent`; some devices use different touch device nodes or coordinate systems and may not work.
 - Multi-touch does not capture native touch, so key presses are also delivered to the game underneath.
 - The virtual mouse only drags on the small touchpad (the full-screen drag approach was removed) to keep native touch intact.
-- The joystick and trackpad gestures (two-finger tap, etc.) are not supported in multi-touch mode.
+- Trackpad gestures (two-finger tap, etc.) don't use hot zones — the pad has its own evdev channel. A joystick sitting on the pad belongs to the joystick, so pushing it won't drag the cursor.
 - Injected touches are a separate input stream; a few games may ignore them.
 - No iOS / no-Shizuku mode.
 

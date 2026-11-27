@@ -286,6 +286,18 @@ class KeypadOverlay(private val context: Context) {
     private val joyWorker = Executors.newSingleThreadExecutor()
     private var anchorWarned = false
 
+    /**
+     * 摇杆的命中圆（屏幕坐标）。
+     *
+     * 热区模式的触摸是旁听来的，命中判断跑在旁听线程上，不能在那里调 View 的
+     * getLocationOnScreen（跨线程读窗口位置不安全），所以在 UI 线程算好这份缓存，
+     * 整体替换成新列表，旁听线程只读。
+     */
+    private class JoyHit(val keyId: Long, val cx: Float, val cy: Float, val r: Float)
+
+    @Volatile
+    private var joyHits: List<JoyHit> = emptyList()
+
     /** 锁定键：当前处于"保持按下"状态的按键 id */
     private val latchedKeys = HashSet<Long>()
 
@@ -505,6 +517,8 @@ class KeypadOverlay(private val context: Context) {
         }
         if (gameKeyboardOn) buildGameKeyboard()
         if (editMode) syncAnchorMarkers()
+        // 旋转/尺寸变化后按键位置全变了，摇杆命中圆要重算
+        refreshJoyHits()
         if (mouseOn) {
             placeCursor()
             cursorView?.let { v ->
@@ -1104,15 +1118,16 @@ class KeypadOverlay(private val context: Context) {
     /**
      * 触摸键在正常模式下是"穿透区"：窗口不可触摸，手指直接落到下面的游戏，
      * 由系统提供原生多点触控，没有注入、没有等待、不会被打断。
-     * 热区模式只让键盘按键穿透（靠旁听坐标触发）；
-     * 摇杆、鼠标按键仍保持可触摸，它们本来就要占住手指或接住按下。
+     * 热区模式把键盘按键、鼠标按键和摇杆都让出去，改由旁听坐标触发——
+     * 摇杆只有这样才吃得到第一根手指已落在游戏上时的第二、第三根手指。
      * 编辑模式必须可触摸，否则没法拖动/删除。
      */
     private fun applyKeyTouchability() {
         keyViews.forEach { (id, v) ->
             val key = keys.firstOrNull { it.id == id } ?: return@forEach
             val p = v.layoutParams as? WindowManager.LayoutParams ?: return@forEach
-            val hotKey = hotMode && (key.type == KeyType.KEY || key.type.isMouse)
+            val hotKey = hotMode &&
+                (key.type == KeyType.KEY || key.type.isMouse || key.type == KeyType.JOYSTICK)
             val passthrough = !editMode && (key.type == KeyType.TOUCH || hotKey)
             val flags = if (passthrough) {
                 p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -1124,6 +1139,8 @@ class KeypadOverlay(private val context: Context) {
                 runCatching { wm.updateViewLayout(v, p) }
             }
         }
+        // 窗口位置/可触摸状态都定下来了，同步摇杆命中圆，旁听线程才认得出摇杆
+        refreshJoyHits()
     }
 
     /**
@@ -1391,6 +1408,33 @@ class KeypadOverlay(private val context: Context) {
                 }
             }
         }
+    }
+
+    /**
+     * 刷新摇杆的命中圆：按键位置变了（拖动、重建、显隐、旋转）都要调一次。
+     * 只在 UI 线程调用。
+     */
+    private fun refreshJoyHits() {
+        val out = ArrayList<JoyHit>(keys.size)
+        keys.forEach { k ->
+            if (k.type != KeyType.JOYSTICK || !isKeyVisible(k)) return@forEach
+            val v = keyViews[k.id] ?: return@forEach
+            if (v.visibility != View.VISIBLE) return@forEach
+            val loc = IntArray(2)
+            v.getLocationOnScreen(loc)
+            out.add(JoyHit(k.id, loc[0] + v.width / 2f, loc[1] + v.height / 2f, v.width / 2f))
+        }
+        joyHits = out
+    }
+
+    /** 屏幕坐标命中的摇杆；两侧线程都只读这份缓存 */
+    private fun joyHitAt(x: Float, y: Float): JoyHit? {
+        val list = joyHits
+        for (i in list.indices) {
+            val h = list[i]
+            if (hypot(x - h.cx, y - h.cy) <= h.r) return h
+        }
+        return null
     }
 
     /** 屏幕坐标是否落在某个按键窗口上 */
@@ -1736,6 +1780,7 @@ class KeypadOverlay(private val context: Context) {
             }
             if (!isKeyVisible(key)) latchedKeys.remove(key.id)
         }
+        refreshJoyHits()
         if (editMode) syncAnchorMarkers()
     }
 
@@ -1749,6 +1794,7 @@ class KeypadOverlay(private val context: Context) {
         if (off) {
             // 关闭前松开所有正在按的键，避免隐藏后游戏里卡键
             hotPointers.clear()
+            hotJoys.clear()
             releaseLatchedKeys()
             releaseAllJoysticks()
             keys.forEach { key ->
@@ -1768,6 +1814,7 @@ class KeypadOverlay(private val context: Context) {
         val vis = if (allKeysOff) View.GONE else View.VISIBLE
         keyViews.values.forEach { it.visibility = vis }
         anchorViews.values.forEach { it.visibility = vis }
+        refreshJoyHits()
     }
 
     // ==================== 热区模式 ====================
@@ -1779,6 +1826,11 @@ class KeypadOverlay(private val context: Context) {
 
     // keyId -> 正在按住它的手指 id
     private val hotPointers = HashMap<Long, Int>()
+
+    // 摇杆不走 hotPointers：一根手指要一直跟着摇杆走，得先由手指反查摇杆
+    // fingerId -> 摇杆 keyId（同时按两个摇杆时天然互不干扰）。
+    // 旁听线程也要读它（判断这根手指归摇杆还是归触控板），所以用并发安全的 Map。
+    private val hotJoys = java.util.concurrent.ConcurrentHashMap<Int, Long>()
 
     // 热区模式下的全屏滑动：每根手指的上一帧坐标，用来移动鼠标光标
     private val hotCursorLast = HashMap<Int, PointF>()
@@ -1821,6 +1873,10 @@ class KeypadOverlay(private val context: Context) {
         // 触控板的位移已经在 onEvdev 里按旁听线程处理完了，这里只管热区按键
         if (!hotMode) return
         if (action == EvdevTouch.UP) {
+            // 摇杆：抬手就松开方向和触点，摇杆头弹回中心
+            hotJoys.remove(id)?.let { kid ->
+                keys.firstOrNull { it.id == kid }?.let { k -> releaseKey(k) }
+            }
             hotCursorLast.remove(id)?.let {
                 val moved = hotCursorMoved.remove(id)
                 hotCursorTravel.remove(id)
@@ -1838,6 +1894,11 @@ class KeypadOverlay(private val context: Context) {
             return
         }
         if (action == EvdevTouch.MOVE) {
+            // 这根手指按在摇杆上：位移全部喂给摇杆，不再当全屏拖动
+            hotJoys[id]?.let { kid ->
+                keys.firstOrNull { it.id == kid }?.let { k -> joyMove(k, x, y) }
+                return
+            }
             val last = hotCursorLast[id] ?: return
             val dx = x - last.x
             val dy = y - last.y
@@ -1856,6 +1917,17 @@ class KeypadOverlay(private val context: Context) {
         }
         if (action != EvdevTouch.DOWN) return
         val loc = IntArray(2)
+        // 摇杆先判：盘面比按键窗口大，而且按住之后要一直跟着这根手指走，
+        // 所以命中就独占这根手指，后面的按键逻辑不再处理它
+        val hitJoy = joyHitAt(x, y)
+        if (hitJoy != null && !hotJoys.containsValue(hitJoy.keyId)) {
+            val k = keys.firstOrNull { it.id == hitJoy.keyId }
+            if (k != null) {
+                hotJoys[id] = k.id
+                pressKey(k, x, y)
+                return
+            }
+        }
         var hitKey = false
         keys.forEach { k ->
             if ((k.type != KeyType.KEY && !k.type.isMouse) || !isKeyVisible(k)) return@forEach
@@ -1880,6 +1952,10 @@ class KeypadOverlay(private val context: Context) {
     }
 
     private fun releaseHotKeys() {
+        // 摇杆也在热区里：关开关 / 进编辑 / 隐藏时一起松开，避免游戏里卡着方向
+        val joys = hotJoys.values.toList()
+        hotJoys.clear()
+        joys.forEach { kid -> keys.firstOrNull { it.id == kid }?.let { k -> releaseKey(k) } }
         val ids = hotPointers.keys.toList()
         hotPointers.clear()
         ids.forEach { kid -> keys.firstOrNull { it.id == kid }?.let { k -> releaseKey(k) } }
@@ -2021,6 +2097,8 @@ class KeypadOverlay(private val context: Context) {
                         key.cx = ((params.x + s / 2f) / screenW).coerceIn(0.01f, 0.99f)
                         key.cy = ((params.y + s / 2f) / screenH).coerceIn(0.01f, 0.99f)
                         runCatching { wm.updateViewLayout(view, params) }
+                        // 摇杆挪了位置，命中圆要跟着走
+                        if (key.type == KeyType.JOYSTICK) refreshJoyHits()
                     }
                     return true
                 }
@@ -2042,6 +2120,7 @@ class KeypadOverlay(private val context: Context) {
 
     private fun clearTouchState() {
         releaseAllJoysticks()
+        hotJoys.clear()
         releaseLatchedKeys()
         synchronized(touchLock) {
             touchPointerIds.clear()
@@ -3273,8 +3352,13 @@ class KeypadOverlay(private val context: Context) {
      * 返回 true 表示这颗手指归触控板，后面的按键热区逻辑别再去处理它。
      */
     private fun handlePadEvdev(action: Int, id: Int, x: Float, y: Float): Boolean {
+        // 这根手指已经归摇杆了：别再当成触控板拖动去抢，
+        // 否则摇杆手指会被触控板"回头认领"，位移被吞掉就推不动了
+        if (action != EvdevTouch.DOWN && hotMode && hotJoys.containsKey(id)) return false
         if (action == EvdevTouch.DOWN) {
             if (!padRectContains(x, y)) return false
+            // 摇杆盘落在触控板范围内时归摇杆：推摇杆不该顺带把光标拖走
+            if (joyHitAt(x, y) != null) return false
             padFingerId = id
             padFingerX = x
             padFingerY = y
