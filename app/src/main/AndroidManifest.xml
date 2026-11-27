@@ -37,6 +37,11 @@
             android:name=".HelpActivity"
             android:exported="false" />
 
+        <!-- 实验模块：鼠标注入探针（独立开关 / 独立窗口 / 独立日志，可整体摘除） -->
+        <activity
+            android:name=".MouseProbeActivity"
+            android:exported="false" />
+
         <!-- 承载悬浮层，保证切到游戏后按键不被回收 -->
         <service
             android:name=".OverlayService"

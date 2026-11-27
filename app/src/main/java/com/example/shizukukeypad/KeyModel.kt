@@ -294,6 +294,7 @@ object KeyStore {
     private const val K_ONE_KEY = "one_key_on"
     private const val K_HOT_MODE = "hot_mode"
     private const val K_MOUSE_GAIN = "mouse_gain"
+    private const val K_CLOUD_MOUSE = "cloud_mouse"
     private const val K_GAME_KEYBOARD = "game_keyboard"
     private const val K_PANEL_WIDTH = "panel_width_dp"
     private const val K_BLOCK_IME = "block_ime"
@@ -446,6 +447,7 @@ object KeyStore {
         root.put("keys", keysToJson(loadKeys(ctx)))
         root.put("alpha", loadAlpha(ctx))
         root.put("mouseGain", loadMouseGain(ctx))
+        root.put("cloudMouse", loadCloudMouse(ctx))
         root.put("hotMode", loadHotMode(ctx))
         root.put("oneKeyOn", loadOneKeyOn(ctx))
         root.put("gameKeyboard", loadGameKeyboard(ctx))
@@ -476,6 +478,7 @@ object KeyStore {
         if (n == 0) return null
         val presets = root.optJSONObject("presets")?.length() ?: 0
         val hasSettings = root.has("alpha") || root.has("mouseGain") || root.has("hotMode") ||
+            root.has("cloudMouse") ||
             root.has("panelWidthDp") || root.has("toolbar")
         return ProfilePreview(root.optInt("version", PROFILE_VERSION), n, presets, hasSettings)
     }
@@ -501,6 +504,7 @@ object KeyStore {
             // 外观与鼠标参数一起带过来，换机/分享时才是一份「完整布局」
             if (o.has("alpha")) e.putInt(K_ALPHA, o.optInt("alpha", 100).coerceIn(30, 100))
             if (o.has("mouseGain")) e.putInt(K_MOUSE_GAIN, o.optInt("mouseGain", 150).coerceIn(50, 250))
+            if (o.has("cloudMouse")) e.putBoolean(K_CLOUD_MOUSE, o.optBoolean("cloudMouse", false))
             if (o.has("hotMode")) e.putBoolean(K_HOT_MODE, o.optBoolean("hotMode", true))
             if (o.has("oneKeyOn")) e.putBoolean(K_ONE_KEY, o.optBoolean("oneKeyOn", true))
             if (o.has("gameKeyboard")) e.putBoolean(K_GAME_KEYBOARD, o.optBoolean("gameKeyboard", false))
@@ -601,6 +605,16 @@ object KeyStore {
 
     fun saveMouseGain(ctx: Context, value: Int) {
         sp(ctx).edit().putInt(K_MOUSE_GAIN, value.coerceIn(50, 250)).apply()
+    }
+
+    /**
+     * 云游戏鼠标：坐标直通（不做相对累积、不做灵敏度放大），
+     * 并且鼠标左键支持「长按按住」，用来在云游戏里按住开火同时滑动。
+     */
+    fun loadCloudMouse(ctx: Context): Boolean = sp(ctx).getBoolean(K_CLOUD_MOUSE, false)
+
+    fun saveCloudMouse(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(K_CLOUD_MOUSE, value).apply()
     }
 
     /** 一键开关总开关：默认打开 */

@@ -92,6 +92,10 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.btnHelp).setOnClickListener {
             startActivity(Intent(this, HelpActivity::class.java))
         }
+        // 实验模块入口（整块可摘除）
+        findViewById<View>(R.id.btnMouseProbe).setOnClickListener {
+            startActivity(Intent(this, MouseProbeActivity::class.java))
+        }
         findViewById<TextView>(R.id.aboutLink).setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
@@ -107,6 +111,7 @@ class MainActivity : Activity() {
             ?.let { findViewById<TextView>(R.id.aboutLink).text = getString(R.string.about_link_with_version, "v$it") }
         setupAlphaSlider()
         setupMouseGainSlider()
+        setupCloudMouseSwitch()
         setupBlockImeSwitch()
         setupPresetButtons()
 
@@ -270,6 +275,27 @@ class MainActivity : Activity() {
             label.text = getString(R.string.mouse_gain_label, v)
             KeyStore.saveMouseGain(this@MainActivity, v)
             OverlayService.current?.setMouseGain(v)
+        }
+    }
+
+    /** 云游戏鼠标：坐标直通 + 左键长按按住。开着时灵敏度滑条不再起作用 */
+    private fun setupCloudMouseSwitch() {
+        val sw = findViewById<MaterialSwitch>(R.id.swCloudMouse)
+        val gainSlider = findViewById<Slider>(R.id.seekMouseGain)
+        val saved = KeyStore.loadCloudMouse(this)
+        sw.isChecked = saved
+        gainSlider.isEnabled = !saved
+        sw.setOnCheckedChangeListener { _, checked ->
+            KeyStore.saveCloudMouse(this, checked)
+            gainSlider.isEnabled = !checked
+            if (OverlayService.overlayShowing) {
+                // 浮层在跑：交给它自己弹提示，切换立即生效
+                OverlayService.current?.setCloudMouse(checked)
+            } else {
+                toast(getString(
+                    if (checked) R.string.toast_cloud_mouse_on else R.string.toast_cloud_mouse_off
+                ))
+            }
         }
     }
 

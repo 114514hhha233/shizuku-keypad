@@ -28,8 +28,8 @@ android {
         applicationId = "com.example.shizukukeypad"
         minSdk = 26
         targetSdk = 34
-        versionCode = 34
-        versionName = "1.7.3"
+        versionCode = 36
+        versionName = "1.8.0"
     }
 
     signingConfigs {

@@ -259,6 +259,21 @@ class KeypadOverlay(private val context: Context) {
     @Volatile
     private var mouseLeftHeld = false
 
+    /**
+     * 云游戏鼠标（设置页开关）：
+     *  - 坐标直通：手指屏幕坐标直接当鼠标坐标，不做相对累积、不做灵敏度放大；
+     *  - 左键长按 = 按住：为了让「按住开火 + 滑动」像手游开火键那样能用。
+     */
+    @Volatile
+    private var cloudMouse = false
+
+    /** 左键长按计时：token 自增即作废上一次未到时的计时 */
+    private var cloudHoldToken = 0
+    private var cloudHoldKeyId = -1L
+
+    /** 左键已经处于按住时，下一次按压只是「松开」操作，记下这个键 */
+    private var cloudReleaseTapId = -1L
+
     /** 鼠标注入失败提示的节流时间戳 */
     private var lastMouseFailToastAt = 0L
 
@@ -428,6 +443,7 @@ class KeypadOverlay(private val context: Context) {
         mouseY = (saved.y * screenH).coerceIn(0f, (screenH - 1).toFloat())
         keyAlpha = KeyStore.loadAlpha(context) / 100f
         mouseGain = KeyStore.loadMouseGain(context) / 100f
+        cloudMouse = KeyStore.loadCloudMouse(context)
         oneKeyOn = KeyStore.loadOneKeyOn(context)
         gameKeyboardOn = KeyStore.loadGameKeyboard(context)
         hotMode = KeyStore.loadHotMode(context)
@@ -452,6 +468,17 @@ class KeypadOverlay(private val context: Context) {
     /** 鼠标灵敏度，50..250（百分比） */
     fun setMouseGain(percent: Int) {
         mouseGain = percent.coerceIn(50, 250) / 100f
+    }
+
+    /** 云游戏鼠标：直通坐标 + 左键长按按住 */
+    fun setCloudMouse(on: Boolean) {
+        if (cloudMouse == on) return
+        cloudMouse = on
+        cloudHoldToken++
+        cloudHoldKeyId = -1L
+        cloudReleaseTapId = -1L
+        if (!on) releaseMouseLeft()
+        toast(getString(if (on) R.string.toast_cloud_mouse_on else R.string.toast_cloud_mouse_off))
     }
 
     fun hide() {
@@ -1673,8 +1700,53 @@ class KeypadOverlay(private val context: Context) {
             key.type == KeyType.WHEEL_UP || key.type == KeyType.WHEEL_DOWN ->
                 injectMouse { doMouseKey(key.type) }
 
+            // 云游戏鼠标：左键长出「按住」语义 —— 长按 450ms 变按住，再轻点一下松开。
+            // 「按住开火 + 滑动」就靠它：按下后所有移动都带 buttonState，游戏看到的是拖动。
+            key.type == KeyType.MOUSE_LEFT && cloudMouse -> armCloudHold(key)
+
             else -> Unit
         }
+    }
+
+    /**
+     * 云游戏鼠标的左键长按判定：
+     * 手指按住 450ms 还没抬 → 左键按住（锁定，抬手不清除）；
+     * 已经按住时再点一下这个键 → 松开。
+     *
+     * 锁定而不是「跟着手指按住」，是因为注入鼠标事件有可能把这一下触摸判成 CANCEL。
+     * 判成 CANCEL 只会让我们收不到 UP，锁定状态本身不受影响，再点一下照样能松开。
+     */
+    private fun armCloudHold(key: KeyItem) {
+        if (mouseLeftHeld) {
+            // 已经按住：这一次按压只当「松开」用
+            cloudReleaseTapId = key.id
+            return
+        }
+        val token = ++cloudHoldToken
+        cloudHoldKeyId = key.id
+        ui.postDelayed({
+            if (token != cloudHoldToken) return@postDelayed
+            if ((pressCounts[key.id] ?: 0) <= 0) return@postDelayed
+            if (!cloudMouse) return@postDelayed
+            cloudHoldKeyId = -1L
+            setMouseLeftHeld(true)
+        }, 450L)
+    }
+
+    private fun finishCloudHold(key: KeyItem) {
+        if (cloudReleaseTapId == key.id) {
+            // 这一下是「点掉按住」
+            cloudReleaseTapId = -1L
+            setMouseLeftHeld(false)
+            return
+        }
+        if (cloudHoldKeyId == key.id) {
+            cloudHoldToken++          // 作废还没到时的长按计时
+            cloudHoldKeyId = -1L
+        }
+        // 处于按住状态：抬手既不该松开，也不该补一次单击
+        if (mouseLeftHeld) return
+        injectMouse { doMouseKey(key.type) }
     }
 
     /** 宏：按步骤顺序执行，步骤内同时按下再反序松开 */
@@ -1707,6 +1779,7 @@ class KeypadOverlay(private val context: Context) {
             key.type == KeyType.KEY -> worker.execute { ShizukuInjector.keyUp(key.keyCode) }
             key.type == KeyType.JOYSTICK -> joyEnd(key)
             key.type == KeyType.TOUCH -> touchKeyUp(key)
+            key.type == KeyType.MOUSE_LEFT && cloudMouse && click -> finishCloudHold(key)
             key.type.isMouse && click && key.type != KeyType.WHEEL_UP && key.type != KeyType.WHEEL_DOWN -> {
                 injectMouse { doMouseKey(key.type) }
             }
@@ -1809,6 +1882,10 @@ class KeypadOverlay(private val context: Context) {
             hotJoys.clear()
             releaseLatchedKeys()
             releaseAllJoysticks()
+            releaseMouseLeft()
+            cloudHoldToken++
+            cloudHoldKeyId = -1L
+            cloudReleaseTapId = -1L
             keys.forEach { key ->
                 keyViews[key.id]?.let { releaseViewPointers(it) }
                 repeat(pressCounts[key.id] ?: 0) { releaseKey(key) }
@@ -1921,8 +1998,14 @@ class KeypadOverlay(private val context: Context) {
             hotCursorTravel[id] = travel
             if (travel > touchSlop) hotCursorMoved.add(id)
             if (id !in hotCursorMoved) return
-            mouseX = (mouseX + dx * mouseGain).coerceIn(0f, (screenW - 1).toFloat())
-            mouseY = (mouseY + dy * mouseGain).coerceIn(0f, (screenH - 1).toFloat())
+            if (cloudMouse) {
+                // 云游戏鼠标：手指在哪，光标就在哪（1:1 直通，不累积、不放大）
+                mouseX = x.coerceIn(0f, (screenW - 1).toFloat())
+                mouseY = y.coerceIn(0f, (screenH - 1).toFloat())
+            } else {
+                mouseX = (mouseX + dx * mouseGain).coerceIn(0f, (screenW - 1).toFloat())
+                mouseY = (mouseY + dy * mouseGain).coerceIn(0f, (screenH - 1).toFloat())
+            }
             // 箭头立刻跟手，注入交给 MouseEngine 的固定节拍（这里不再自己 16ms 节流）
             onMouseMoved()
             return
@@ -2134,6 +2217,10 @@ class KeypadOverlay(private val context: Context) {
         releaseAllJoysticks()
         hotJoys.clear()
         releaseLatchedKeys()
+        releaseMouseLeft()
+        cloudHoldToken++
+        cloudHoldKeyId = -1L
+        cloudReleaseTapId = -1L
         synchronized(touchLock) {
             touchPointerIds.clear()
             pendingTouchRelease.clear()
@@ -3413,8 +3500,13 @@ class KeypadOverlay(private val context: Context) {
             if (!padDragMoved) return true
             val gain = mouseGain
             synchronized(padLock) {
-                mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
-                mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
+                if (cloudMouse) {
+                    mouseX = x.coerceIn(0f, (screenW - 1).toFloat())
+                    mouseY = y.coerceIn(0f, (screenH - 1).toFloat())
+                } else {
+                    mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
+                    mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
+                }
             }
             // 注入立刻跟上（这里是旁听线程，不受 UI 线程卡顿影响）
             MouseEngine.setTarget(mouseX, mouseY)
@@ -3440,8 +3532,13 @@ class KeypadOverlay(private val context: Context) {
         if (abs(dx) + abs(dy) > 1f) padDragMoved = true
         if (!padDragMoved) return
         val gain = mouseGain
-        mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
-        mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
+        if (cloudMouse) {
+            mouseX = x.coerceIn(0f, (screenW - 1).toFloat())
+            mouseY = y.coerceIn(0f, (screenH - 1).toFloat())
+        } else {
+            mouseX = (mouseX + dx * gain).coerceIn(0f, (screenW - 1).toFloat())
+            mouseY = (mouseY + dy * gain).coerceIn(0f, (screenH - 1).toFloat())
+        }
         onMouseMoved()
     }
 
