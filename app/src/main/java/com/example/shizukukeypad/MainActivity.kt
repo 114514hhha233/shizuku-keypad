@@ -92,6 +92,17 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.btnHelp).setOnClickListener {
             startActivity(Intent(this, HelpActivity::class.java))
         }
+        // 鼠标三种移动方式的随手教程：就地弹出来，不用翻帮助页
+        findViewById<TextView>(R.id.tvMouseGuide).setOnClickListener {
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.help_q9_title)
+                .setMessage(R.string.help_q9_body)
+                .setPositiveButton(R.string.action_ok, null)
+                .setNeutralButton(R.string.help_entry_title) { _, _ ->
+                    startActivity(Intent(this, HelpActivity::class.java))
+                }
+                .show()
+        }
         // 实验模块入口（整块可摘除）
         findViewById<View>(R.id.btnMouseProbe).setOnClickListener {
             startActivity(Intent(this, MouseProbeActivity::class.java))

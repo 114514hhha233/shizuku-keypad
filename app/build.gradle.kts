@@ -28,7 +28,7 @@ android {
         applicationId = "com.example.shizukukeypad"
         minSdk = 26
         targetSdk = 34
-        versionCode = 39
+        versionCode = 40
         versionName = "1.8.0"
     }
 

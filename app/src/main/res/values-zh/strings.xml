@@ -74,6 +74,9 @@
     <string name="help_q5_title">Shizuku 或悬浮窗权限未就绪</string>
     <string name="help_q5_body">状态卡两个圆点都变绿才可用。\n· Shizuku 需要 11 以上版本，手机重启后要重新启动 Shizuku。\n· 未授权时点「授权 Shizuku」；未授予悬浮窗时点「授予悬浮窗权限」。</string>
     <string name="help_q6_title">修改按键位置、大小和键值</string>
+    <string name="mouse_guide_entry">鼠标怎么动？看 60 秒教程 ›</string>
+    <string name="help_q9_title">鼠标怎么移动：三种方式</string>
+    <string name="help_q9_body">光标只有一个，位置三种共用，可以同时开着，用哪个看场景：\n\n1. 触控板（工具栏 ↖）\n点开后屏幕上多一块小盘面，在上面拖，光标相对移动、灵敏度滑条起作用；没拖动过的轻点=左键单击，左键处于按住状态时轻点=松开。适合需要精细瞄准、又不想让手指挡住视野的场景。\n\n2. 全屏跟手（工具栏 ◈ 多点触控）\n开了多点触控，整块屏幕就是触控板：手指在哪光标在哪，1:1 不放大。它靠旁听触摸屏驱动，游戏收到的仍是原生触摸，不抢手势。适合云游戏，代价是手指会挡住画面。\n\n3. 鼠标摇杆（摇杆的第三档「鼠标模式」）\n盘面本身就是触控板：按下即按住、滑动即移动，一根手指就完成「按住开火 + 滑动瞄准」。按住时注入什么可在编辑里改（左/右/中键或自定义键值）。适合 FPS 边走边打。\n\n注意：只有「云游戏鼠标（坐标直通）」打开时才是 1:1 直通；关掉时触控板和全屏都按相对增量走，灵敏度滑条生效。</string>
     <string name="help_q8_title">云游戏里怎么用鼠标 / 按住开火 + 滑动</string>
     <string name="help_q8_body">先在工具栏打开鼠标（↖）和多点触控（◈），再在主界面打开「云游戏鼠标（坐标直通）」。\n· 开启后光标 1:1 跟手：手指在哪，光标就在哪，不做相对累积也不放大灵敏度。\n· 全屏跟手靠的是「多点触控」那套旁听：整屏都能驱动光标，触摸却照样直通游戏，不会像以前那层全屏触摸窗一样把游戏触摸吃掉。\n· 左键改成长按按住：按住 450ms 不动即按住，抬手也保持；再轻点一下这个键就松开。\n· 摇杆可以选「鼠标模式」：盘面就是触控板，一根手指按下即按住左键、滑动即移动光标，一根手指就完成「按住开火 + 滑动」。</string>
     <string name="help_q6_body">工具栏点「✎ 编辑」后可直接拖动按键；点按键可改键位、显示文字、大小、形状、注入方式，或删除。\n「＋」添加按键，内置字母、数字、F1-F12、方向键、小键盘和鼠标键；「⚡ 宏」可以把一串按键绑到一个键上。</string>
@@ -115,6 +118,7 @@
     <string name="toast_name_empty">名称不能为空</string>
     <string name="toast_preset_saved">已保存预设「%1$s」</string>
     <string name="action_cancel">取消</string>
+    <string name="action_ok">知道了</string>
     <string name="toast_no_presets">还没有保存过预设</string>
     <string name="dialog_load_preset">加载预设</string>
     <string name="dialog_delete_preset">删除预设</string>

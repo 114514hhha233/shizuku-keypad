@@ -74,6 +74,9 @@
     <string name="help_q5_title">Shizuku or overlay permission is not ready</string>
     <string name="help_q5_body">Both dots on the status card must be green.\n· Shizuku requires version 11 or newer, and must be started again after a reboot.\n· Tap “Authorize Shizuku” when unauthorized, and “Grant overlay permission” when it is not granted.</string>
     <string name="help_q6_title">Change key position, size and key code</string>
+    <string name="mouse_guide_entry">How to move the cursor? 60-second guide ›</string>
+    <string name="help_q9_title">Moving the mouse: three ways</string>
+    <string name="help_q9_body">There is one cursor. All three ways share its position and can be enabled together.\n\n1. Touchpad (toolbar ↖)\nA small pad appears on screen: drag on it and the cursor moves relatively, with the sensitivity slider applied. A tap without dragging is a left click; while the left button is held, a tap releases it. Best when you want fine aiming without covering the view.\n\n2. Full-screen tracking (toolbar ◈ Multi-touch)\nWith multi-touch on, the whole screen is the pad: the cursor follows your finger 1:1. It is driven by listening to the touch screen, so the game still receives native touches. Best for cloud gaming; your finger does cover the view.\n\n3. Mouse joystick (third joystick mode \"mouse\")\nThe stick surface itself is the pad: press to hold, slide to move. One finger does \"hold to fire + aim\". What the hold injects is configurable (left/right/middle button or a custom key code). Best for FPS.\n\nNote: positions are 1:1 only while \"Cloud-game mouse (direct coordinates)\" is on. With it off, both the touchpad and the full-screen path move relatively and the sensitivity slider applies.</string>
     <string name="help_q8_title">Mouse in cloud gaming / hold fire + slide</string>
     <string name="help_q8_body">Turn on the mouse pad (\u2196) and Multi-touch (\u25c8) in the toolbar first, then enable \"Cloud-gaming mouse (pass-through)\" on the main screen.\n\u00b7 The cursor follows your finger 1:1 \u2014 no accumulation, no sensitivity boost.\n\u00b7 Full-screen tracking rides on the Multi-touch touch-listening path: the whole screen drives the cursor while touches still reach the game, unlike the old full-screen touch layer that ate them.\n\u00b7 The left button becomes holdable: keep it pressed for 450ms to hold, it stays held after you lift; tap it again to release.\n\u00b7 A joystick can be set to \u201cMouse mode\u201d: the pad itself is the touchpad \u2014 press to hold the left button, slide to move the cursor, so a single finger does \u201chold fire + slide\u201d.</string>
     <string name="help_q6_body">Tap “Edit” in the toolbar to drag keys; tap a key to change its key code, label, size, shape, injection method, or delete it.\n“＋” adds keys: letters, digits, F1-F12, arrows, numpad and mouse buttons are built in. “Macro” binds a key sequence to one key.</string>
@@ -115,6 +118,7 @@
     <string name="toast_name_empty">Name cannot be empty</string>
     <string name="toast_preset_saved">Preset “%1$s” saved</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_ok">Got it</string>
     <string name="toast_no_presets">No presets saved yet</string>
     <string name="dialog_load_preset">Load preset</string>
     <string name="dialog_delete_preset">Delete preset</string>
